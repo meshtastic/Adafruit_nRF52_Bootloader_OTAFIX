@@ -33,11 +33,10 @@
 #include <string.h>
 #include <stdlib.h>
 
-// Overlap 4x chars by this much.
-#define CHAR4_KERNING 3
-
-// Width of a single 4x char, adjusted by kerning
-#define CHAR4_KERNED_WIDTH  (6 * 4 - CHAR4_KERNING)
+// Size independant kerning
+#define CHAR_ADV(n)  (5 * (n) + 1)   // cursor step between chars
+#define CHAR_INK(n)  (6 * (n))       // columns printch actually writes
+#define TEXT_WIDTH(n, len)  ((len) ? CHAR_ADV(n) * ((len) - 1) + CHAR_INK(n) : 0)
 
 #define COL0(r, g, b) ((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3))
 #define COL(c) COL0((c >> 16) & 0xff, (c >> 8) & 0xff, c & 0xff)
@@ -77,6 +76,56 @@ const uint16_t palette[] = {
     COL(0x000000), // 15
 };
 
+// inital display-size agnostic hack
+#ifndef SCREEN_BAR1_Y
+#define SCREEN_BAR1_Y       0
+#endif
+#ifndef SCREEN_BAR1_H
+#define SCREEN_BAR1_H       52
+#endif
+
+#ifndef SCREEN_BAR2_Y
+#define SCREEN_BAR2_Y       52
+#endif
+#ifndef SCREEN_BAR2_H
+#define SCREEN_BAR2_H       55
+#endif
+
+#ifndef SCREEN_BAR3_Y
+#define SCREEN_BAR3_Y       107
+#endif
+#ifndef SCREEN_BAR3_H
+#define SCREEN_BAR3_H       14
+#endif
+#ifndef fileLogo_X
+#define fileLogo_X           0
+#endif
+#ifndef arrowLogo_X
+#define arrowLogo_X          65
+#endif
+#ifndef pendriveLogo_X
+#define pendriveLogo_X       129
+#endif
+#ifndef DISPLAY_TITLE_Y
+#define DISPLAY_TITLE_Y      5
+#endif
+#ifndef UF2_VERSION_BASE_Y
+#define UF2_VERSION_BASE_Y   40
+#endif
+#ifndef BANNER_TEXT_X
+#define BANNER_TEXT_X        23
+#endif
+#ifndef BANNER_TEXT_Y
+#define BANNER_TEXT_Y        110
+#endif
+#ifndef BLE_OTA_Y
+#define BLE_OTA_Y            65
+#endif
+#ifndef FONT_SIZE_LARGE
+#define FONT_SIZE_LARGE      4
+#endif
+
+
 // TODO only buffer partial screen to save SRAM
 // ESP32s2 can only statically allocated DRAM up to 160KB.
 // the remaining 160KB can only be allocated at runtime as heap.
@@ -92,38 +141,16 @@ extern const uint8_t arrowLogo[];
 //
 //--------------------------------------------------------------------+
 
-// print character with font size = 1
-static void printch(int x, int y, int color, const uint8_t* fnt) {
-  for (int i = 0; i < 6; ++i) {
+// print character
+static void printch(int x, int y, int color, const uint8_t* fnt, int size) {
+  for (int i = 0; i < 6 * size; ++i) {
     uint8_t* p = frame_buf + (x + i) * DISPLAY_HEIGHT + y;
-    uint8_t mask = 0x01;
+    uint8_t b = fnt[i / size];
     for (int j = 0; j < 8; ++j) {
-      if (*fnt & mask) {
-        *p = color;
+      if (b & (1u << j)) {
+        for (int k = 0; k < size; ++k) p[k] = color;
       }
-      p++;
-      mask <<= 1;
-    }
-    fnt++;
-  }
-}
-
-// print character with font size = 4
-static void printch4(int x, int y, int color, const uint8_t* fnt) {
-  for (int i = 0; i < 6 * 4; ++i) {
-    uint8_t* p = frame_buf + (x + i) * DISPLAY_HEIGHT + y;
-    uint8_t mask = 0x01;
-    for (int j = 0; j < 8; ++j) {
-      for (int k = 0; k < 4; ++k) {
-        if (*fnt & mask) {
-          *p = color;
-        }
-        p++;
-      }
-      mask <<= 1;
-    }
-    if ((i & 3) == 3) {
-      fnt++;
+      p += size;
     }
   }
 }
@@ -175,43 +202,23 @@ static void printicon(int x, int y, int color, const uint8_t* icon) {
   }
 }
 
-// print text with font size = 1
-static void print(int x, int y, int col, const char* text) {
-  int x0 = x;
-  while (*text) {
-    char c = *text++;
-    if (c == '\r') continue;
-    if (c == '\n') {
-      x = x0;
-      y += 10;
-      continue;
-    }
-    /*
-    if (x + 8 > DISPLAY_WIDTH) {
-        x = x0;
-        y += 10;
-    }
-    */
-    if (c < ' ') c = '?';
-    if (c >= 0x7f) c = '?';
-    c -= ' ';
-    printch(x, y, col, &font8[c * 6]);
-    x += 6;
-  }
-}
-
-// Print text with font size = 4
-static void print4(int x, int y, int color, const char* text) {
+static void print(int x, int y, int color, const char* text, int size) {
   while (*text) {
     char c = *text++;
     c -= ' ';
-    printch4(x, y, color, &font8[c * 6]);
-    x += CHAR4_KERNED_WIDTH;
-    if (x + CHAR4_KERNED_WIDTH > DISPLAY_WIDTH) {
+    printch(x, y, color, &font8[c * 6], size);
+    x += CHAR_ADV(size);
+    if (x + CHAR_INK(size) > DISPLAY_WIDTH) {
       // Next char won't fit.
       return;
     }
   }
+}
+
+static inline void print_centered(int y, int color, const char* text, int size) {
+  int len = (int) strlen(text);
+  int text_x = (DISPLAY_WIDTH - TEXT_WIDTH(size, len)) / 2;
+  print(text_x >= 0 ? text_x : 0, y, color, text, size);
 }
 
 //--------------------------------------------------------------------+
@@ -242,48 +249,42 @@ static void drawBar(int y, int h, int color) {
 
 // draw drag & drop screen
 void screen_draw_drag(void) {
-  drawBar(0, 52, COLOR_GREEN);
-  drawBar(52, 55, COLOR_BLUE);
-  drawBar(107, 14, COLOR_ORANGE);
+  drawBar(SCREEN_BAR1_Y, SCREEN_BAR1_H, COLOR_GREEN);
+  drawBar(SCREEN_BAR2_Y, SCREEN_BAR2_H, COLOR_BLUE);
+  drawBar(SCREEN_BAR3_Y, SCREEN_BAR3_H, COLOR_ORANGE);
 
-  // Center UF2_PRODUCT_NAME and UF2_VERSION_BASE.
-  int name_x = (DISPLAY_WIDTH - CHAR4_KERNED_WIDTH * (int) strlen(DISPLAY_TITLE)) / 2;
-  print4(name_x >= 0 ? name_x : 0, 5, COLOR_WHITE, DISPLAY_TITLE);
+  // Print title, version, banner.
+  print_centered(DISPLAY_TITLE_Y, COLOR_WHITE, DISPLAY_TITLE, FONT_SIZE_LARGE);
+  print_centered(UF2_VERSION_BASE_Y, COLOR_PURPLE, UF2_VERSION_BASE, 1);
+  print_centered(BANNER_TEXT_Y, COLOR_WHITE, BANNER_TEXT, 1);
 
-  int version_x = (DISPLAY_WIDTH - 6 * (int) strlen(UF2_VERSION_BASE)) / 2;
-  print(version_x >= 0 ? version_x : 0, 40, COLOR_PURPLE, UF2_VERSION_BASE);
-
-  // TODO the reset should be center as well
-  print(23, 110, 1, BANNER_TEXT);
-
+#ifndef DRAG
 #define DRAG 70
+#endif
+#ifndef DRAGX
 #define DRAGX 47
-  printicon(DRAGX + 0, DRAG + 5, COLOR_WHITE, fileLogo);
-  printicon(DRAGX + 65, DRAG, COLOR_WHITE, arrowLogo);
-  printicon(DRAGX + 129, DRAG, COLOR_WHITE, pendriveLogo);
-  print(22, DRAG - 12, COLOR_WHITE, "firmware.uf2");
-  print(160, DRAG - 12, COLOR_WHITE, UF2_VOLUME_LABEL);
+#endif
+  printicon(DRAGX + fileLogo_X, DRAG + 5, COLOR_WHITE, fileLogo);
+  printicon(DRAGX + arrowLogo_X, DRAG, COLOR_WHITE, arrowLogo);
+  printicon(DRAGX + pendriveLogo_X, DRAG, COLOR_WHITE, pendriveLogo);
+  #ifndef NOLABELS
+  print(22, DRAG - 12, COLOR_WHITE, "firmware.uf2", 1);
+  print(160, DRAG - 12, COLOR_WHITE, UF2_VOLUME_LABEL, 1);
+  #endif // NOLABELS
 
   draw_screen(frame_buf);
 }
 
 void screen_draw_ble(void) {
-  drawBar(0, 52, COLOR_GREEN);
-  drawBar(52, 55, COLOR_BLUE);
-  drawBar(107, 14, COLOR_ORANGE);
+  drawBar(SCREEN_BAR1_Y, SCREEN_BAR1_H, COLOR_GREEN);
+  drawBar(SCREEN_BAR2_Y, SCREEN_BAR2_H, COLOR_BLUE);
+  drawBar(SCREEN_BAR3_Y, SCREEN_BAR3_H, COLOR_ORANGE);
 
-  // Center UF2_PRODUCT_NAME and UF2_VERSION_BASE.
-  int name_x = (DISPLAY_WIDTH - CHAR4_KERNED_WIDTH * (int) strlen(DISPLAY_TITLE)) / 2;
-  print4(name_x >= 0 ? name_x : 0, 5, COLOR_WHITE, DISPLAY_TITLE);
-
-  int version_x = (DISPLAY_WIDTH - 6 * (int) strlen(UF2_VERSION_BASE)) / 2;
-  print(version_x >= 0 ? version_x : 0, 40, COLOR_PURPLE, UF2_VERSION_BASE);
-
-  // TODO the reset should be center as well
-  print(23, 110, 1, BANNER_TEXT);
-
-  int ble_x = (DISPLAY_WIDTH - CHAR4_KERNED_WIDTH * (int) strlen("BLE OTA")) / 2;
-  print4(ble_x >= 0 ? ble_x : 0, 65, COLOR_WHITE, "BLE OTA");
+  // Print title, version, OTA, banner
+  print_centered(DISPLAY_TITLE_Y, COLOR_WHITE, DISPLAY_TITLE, FONT_SIZE_LARGE);
+  print_centered(UF2_VERSION_BASE_Y, COLOR_PURPLE, UF2_VERSION_BASE, 1);
+  print_centered(BLE_OTA_Y, COLOR_WHITE, "BLE OTA", FONT_SIZE_LARGE);
+  print_centered(BANNER_TEXT_Y, COLOR_WHITE, BANNER_TEXT, 1);
 
   draw_screen(frame_buf);
 }
