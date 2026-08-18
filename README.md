@@ -73,8 +73,6 @@ If there is another nRF52840-based board you would like to see supported please 
 
 ## Installation
 
-**IMPORTANT:** If you are running a MeshCore companion firmware or Ripple firmware on your device **you will need to run an erase after flashing a new bootloader**. Use the MeshCore web flasher to do the erase, it will guide you to the correct erase firmware for your device. Other erase firmwares will not work, they will not erase the ExtraFS area.
-
 The recommended way to install the bootloader is using the UF2 file.  
 Download the UF2 file for your board (they can be found in the releases with filenames beginning with `update-`), enter UF2 mode (usually by double pressing the reset button within 0.5s) and copy the UF2 file across.
 
@@ -155,14 +153,6 @@ For **OTAFIX 2.0**, the following settings are recommended (these may change —
 **IMPORTANT:**  
 On <u>older versions</u> of the bootloader, performing an OTA update while the device was connected to a computer USB host would complete successfully but **would not automatically boot into the new application firmware**, requiring a manual reset.  
 This issue is fixed in **OTAFIX 2.0**.
-
----
-
-## OTA update on a MeshCore repeater
-
-First you will need to login to the repeater and issue the `start ota` CLI command.
-
-Next, open the nRF Device Firmware Update app, select the appropriate MeshCore firmware zip file for your device, select your device (it will be advertised as `ProMicro_OTA` / `RAK4631_OTA`, etc), and press start.
 
 ---
 
