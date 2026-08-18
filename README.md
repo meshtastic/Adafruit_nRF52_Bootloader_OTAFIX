@@ -1,5 +1,7 @@
 # Adafruit nRF52 Bootloader with Enhanced OTA DFU
 
+This is [Meshtastic](https://meshtastic.org)'s fork of [oltaco's OTAFIX bootloader](https://github.com/oltaco/Adafruit_nRF52_Bootloader_OTAFIX) — the bootloader several nRF52-based Meshtastic devices ship with, and the one the [Meshtastic Android app](https://github.com/meshtastic/Meshtastic-Android) can upgrade in-app (see [Bootloader upgrade from the Meshtastic Android app](#bootloader-upgrade-from-the-meshtastic-android-app) below).
+
 ## Changes in OTAFIX 2.2
 
 - **Use maximum TX power for BLE**  
@@ -70,8 +72,6 @@ If there is another nRF52840-based board you would like to see supported please 
 ---
 
 ## Installation
-
-**IMPORTANT:** If you are running a MeshCore companion firmware or Ripple firmware on your device **you will need to run an erase after flashing a new bootloader**. Use the MeshCore web flasher to do the erase, it will guide you to the correct erase firmware for your device. Other erase firmwares will not work, they will not erase the ExtraFS area.
 
 The recommended way to install the bootloader is using the UF2 file.  
 Download the UF2 file for your board (they can be found in the releases with filenames beginning with `update-`), enter UF2 mode (usually by double pressing the reset button within 0.5s) and copy the UF2 file across.
@@ -156,11 +156,11 @@ This issue is fixed in **OTAFIX 2.0**.
 
 ---
 
-## OTA update on a MeshCore repeater
+## Bootloader upgrade from the Meshtastic Android app
 
-First you will need to login to the repeater and issue the `start ota` CLI command.
+The [Meshtastic Android app](https://github.com/meshtastic/Meshtastic-Android) can flash this bootloader directly — no manual UF2 drag-and-drop needed.
 
-Next, open the nRF Device Firmware Update app, select the appropriate MeshCore firmware zip file for your device, select your device (it will be advertised as `ProMicro_OTA` / `RAK4631_OTA`, etc), and press start.
+With the radio connected over **USB/serial** (not Bluetooth), open the connected radio's configuration, go to **Advanced → Firmware Update**, and where an upgraded bootloader is published for your board you'll see an **Upgrade bootloader** option alongside **Erase and reinstall**. The app reads `INFO_UF2.TXT` from the device's update drive first to confirm the board and Bluetooth stack before writing anything, and will ask you to select the update drive twice — once for the bootloader image, once for the firmware. See the app's [Firmware Updates guide](https://github.com/meshtastic/Meshtastic-Android/blob/main/docs/en/user/firmware.md) for the full flow.
 
 ---
 
