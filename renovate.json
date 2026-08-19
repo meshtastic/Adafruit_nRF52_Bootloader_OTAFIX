@@ -1,0 +1,18 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    ":dependencyDashboard",
+    ":semanticCommitTypeAll(chore)",
+    ":ignoreModulesAndTests",
+    ":noUnscheduledUpdates",
+    "schedule:daily",
+    "group:recommended",
+    "replacements:all",
+    "workarounds:all"
+  ],
+  "baseBranchPatterns": ["master"],
+  "git-submodules": {
+    "enabled": true
+  },
+  "labels": ["dependencies"]
+}
