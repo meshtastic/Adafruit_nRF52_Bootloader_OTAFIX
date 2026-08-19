@@ -117,7 +117,7 @@ static void wait_for_events(void)
 
     // Feed all Watchdog just in case application enable it
     // WDT cannot be disabled once started. It even last through NVIC soft reset
-    if ( nrf_wdt_started(NRF_WDT) )
+    if ( nrf_wdt_started_check(NRF_WDT) )
     {
       for (uint8_t i=0; i<8; i++) nrf_wdt_reload_request_set(NRF_WDT, i);
     }

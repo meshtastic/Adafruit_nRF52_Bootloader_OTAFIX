@@ -5,12 +5,18 @@ Canonical guidance for AI coding agents and maintainers working in this repo.
 
 ## First read
 
-1. `README.md` — boards supported, installation, the Meshtastic Android
-   in-app upgrade flow, troubleshooting.
-2. `CONTRIBUTING.md` — dev setup, PR process, adding a new board.
-3. `changelog.md` — OTAFIX version history (2.1/2.2 at the top; everything
+1. [README.md's "How this fits together"](./README.md#how-this-fits-together)
+   — the boot chain (MBR → this bootloader → SoftDevice → application), why
+   this repo is only the bootloader and not the Meshtastic application
+   itself, and the three ways a new image gets installed (UF2, serial DFU,
+   BLE OTA DFU). Read this before touching `main.c` or `usb/` — the
+   Architecture section below assumes it.
+2. The rest of `README.md` — boards supported, installation, the Meshtastic
+   Android in-app upgrade flow, troubleshooting.
+3. `CONTRIBUTING.md` — dev setup, PR process, adding a new board.
+4. `changelog.md` — OTAFIX version history (2.1/2.2 at the top; everything
    below predates the OTAFIX fork).
-4. The design invariants and gotchas below — do not violate them.
+5. The design invariants and gotchas below — do not violate them.
 
 ## What this is
 
@@ -84,12 +90,26 @@ the vendored `lib/tinyusb`. `cmsis/` is ARM CMSIS headers.
 
 `lib/nrfx`, `lib/tinyusb`, `lib/uf2` are git submodules, **not** vendored
 copies — `git submodule update --init --recursive` is required before any
-build. They are also **years out of date** (checked 2026-08-18: nrfx pinned
-2019, tinyusb 2021, uf2 2020, all several years behind upstream HEAD).
-`renovate.json` now surfaces bump PRs on a daily schedule instead of leaving
-that invisible, but nothing bumps them automatically — these are
-boot-critical, and a multi-year jump needs real hardware testing before
-merge, not a bot auto-merge.
+build. `renovate.json` surfaces bump PRs on a daily schedule, but nothing
+bumps them automatically — these are boot-critical, and a version jump needs
+real hardware testing before merge, not a bot auto-merge.
+
+`lib/nrfx` is deliberately pinned to **v3.14.0**, not the latest commit
+Renovate will keep proposing. nrfx 4.0 restructured the entire repo layout
+(`mdk/` → `bsp/stable/mdk/`, among others) — a jump to it would need this
+repo's Makefile `IPATH`s and every board's linker script reworked, not just
+a digest bump. v3.14.0 is the last tag on the pre-4.0 layout, so it's the
+practical ceiling for a same-day bump; going past it is a real project, not
+a Renovate merge. If a future Renovate PR targets nrfx ≥4.0, that's this
+gotcha firing — don't merge it without doing that rework.
+
+`lib/tinyusb`'s `nrf5x` USB port (`dcd_nrf5x.c`) calls nrfx's chip-specific
+errata functions (e.g. `nrf52_errata_199()`) — bumping tinyusb alone,
+without nrfx at a version new enough to define them, fails to compile. The
+two submodules move together, not independently, which is why Renovate's
+separate per-submodule PRs (#11, #12 as originally filed) each failed CI on
+their own; see the `linker/nrf_common.ld` gotcha below for the other half of
+what that joint bump needed.
 
 `lib/softdevice/` vendors Nordic's SoftDevice binaries directly (not a
 submodule) — `SD_NAME`/`SD_VERSION` in `Makefile` select which one.
@@ -128,8 +148,31 @@ itself; a human has to edit it too.
   PlatformIO target names, never by this repo's directory names. Renaming a
   board directory here for "consistency" achieves nothing functionally and
   risks breaking `UF2_BOARD_ID`/build-artifact filenames for no benefit.
+- **`linker/nrf_common.ld` needs `__data_start`/`__sdata_*`/`__tdata_*`/`__fast_*`
+  symbols since nrfx 3.x.** `lib/nrfx/mdk/gcc_startup_<mcu>.S`'s data-copy loop
+  changed from this repo's `__data_start__`-style (double underscore) names to
+  plain `__data_start`, plus three new RAM-loaded regions (`.sdata`/`.tdata`/
+  `.fast`) nothing in this codebase actually uses. **Do not** pull in nrfx's own
+  updated `mdk/nrf_common.ld` to get these — it also redefines `.bss`/`.noinit`
+  placement, which would silently fight this repo's board `.ld` files (e.g.
+  `linker/nrf52840.ld`'s fixed-address `NOINIT` region used for BLE bond
+  exchange across a DFU reset). The fix already applied is a handful of alias
+  assignments plus zero-length filler for the three unused regions — extend
+  that pattern, don't replace the file.
 - **Board gaps are tracked as issues, not guessed at.** `Meshtastic-Android`
   flags `NANO_G2_ULTRA` and `NOMADSTAR_METEOR_PRO` as needing bootloader
   upgrade support with no board here yet (issues #4, #5) — bringing up a
   new board needs real hardware to get `UF2_BOARD_ID`/VID-PID/pin defs
   right; don't fabricate a `board.h` without one.
+- **`CURRENT.UF2` dump-and-restore used to hang the device — fixed in #20,
+  don't reintroduce it.** Root cause: `CURRENT.UF2` was sized off the max
+  possible app region (`TRUE_USER_FLASH_SIZE`) instead of the real
+  installed app, AND `msc_uf2.c`'s UF2-app-flash completion path never
+  recorded the real app size into `bootloader_settings.bank_0_size` (stayed
+  0 from a `memset`, only the DFU-serial protocol populated it). Together
+  that meant restoring a `CURRENT.UF2` dump byte-for-byte could still hang
+  the device on boot. Both fixed together in #20 (`ghostfat.c`'s
+  `current_flash_size()` + `msc_uf2.c`'s `update_status.app_size`) —
+  verified on real RAK4631 hardware, the same dump-and-restore sequence
+  that hung now completes in ~2 seconds. If you change either of those two
+  files, check this still holds.
