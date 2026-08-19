@@ -1,12 +1,14 @@
 name: Build
 
 on:
-  #  pull_request:
-  #  push:
-  #  repository_dispatch:
-  release:
-    types:
-      - created
+  push:
+    tags:
+      - '*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   set-matrix:
@@ -57,12 +59,30 @@ jobs:
       with:
         name: ${{ matrix.board }}
         path: _bin/${{ matrix.board }}
+        if-no-files-found: error
 
-    - name: Upload Release Asset
-      uses: softprops/action-gh-release@v3
-      if: ${{ github.event_name == 'release' }}
+  draft-release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - name: Collect all board artifacts
+      uses: actions/download-artifact@v6
       with:
+        path: _bin
+        merge-multiple: true
+
+    - name: List collected files
+      run: ls -lR _bin
+
+    - name: Create draft release
+      uses: softprops/action-gh-release@v3
+      with:
+        tag_name: ${{ github.ref_name }}
+        draft: true
+        generate_release_notes: true
+        fail_on_unmatched_files: true
         files: |
-          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-*.zip
-          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-*.hex
-          _bin/${{ matrix.board }}/update-${{ matrix.board }}_bootloader-*.uf2
+          _bin/*_bootloader-*.zip
+          _bin/*_bootloader-*.hex
+          _bin/update-*_bootloader-*.uf2
