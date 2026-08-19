@@ -176,6 +176,49 @@ STATIC_ASSERT(UF2_SECTORS == ((UF2_SIZE/2) / 256)); // Not a requirement ... ens
 #define UF2_FIRST_SECTOR   ((NUM_FILES + 1) * BPB_SECTORS_PER_CLUSTER) // WARNING -- code presumes each non-UF2 file content fits in single sector
 #define UF2_LAST_SECTOR    ((UF2_FIRST_SECTOR + UF2_SECTORS - 1) * BPB_SECTORS_PER_CLUSTER)
 
+// CURRENT.UF2 (the on-the-fly dump of the currently-flashed app) reports and
+// generates content sized to the REAL installed app, not the fixed max
+// TRUE_USER_FLASH_SIZE region above. Otherwise every read/write of
+// CURRENT.UF2 covers however much of the app-flash region is left over from
+// whatever previously occupied it, well past the real app+SD boundary.
+// Mirrors the size adafruit/Adafruit_nRF52_Bootloader#38 (2018) used before
+// this file's current.uf2 handling was rewritten in #128.
+static uint32_t current_flash_size(void)
+{
+  static uint32_t flash_sz = 0;
+
+  if ( flash_sz == 0 )
+  {
+    bootloader_settings_t const * boot_setting;
+    bootloader_util_settings_get(&boot_setting);
+
+    flash_sz = boot_setting->bank_0_size;
+
+    // Round up to a whole UF2 payload chunk, else the last real chunk of
+    // the app would get truncated out of CURRENT.UF2.
+    if ( flash_sz % UF2_FIRMWARE_BYTES_PER_SECTOR )
+    {
+      flash_sz = (flash_sz - (flash_sz % UF2_FIRMWARE_BYTES_PER_SECTOR)) + UF2_FIRMWARE_BYTES_PER_SECTOR;
+    }
+
+    // bank_0_size is 0 or erased-flash when the app was written by a tool
+    // that bypasses the bootloader's own settings page (e.g. a debug
+    // probe) -- fall back to the max region so CURRENT.UF2 still covers
+    // the whole possible app instead of reporting a bogus small size.
+    if ( (flash_sz == 0) || (flash_sz == 0xFFFFFFFFUL) || (flash_sz > TRUE_USER_FLASH_SIZE) )
+    {
+      flash_sz = TRUE_USER_FLASH_SIZE;
+    }
+  }
+
+  return flash_sz;
+}
+
+#define CURRENT_UF2_SECTORS  ( (current_flash_size() / UF2_FIRMWARE_BYTES_PER_SECTOR) + \
+                              ((current_flash_size() % UF2_FIRMWARE_BYTES_PER_SECTOR) ? 1 : 0))
+#define CURRENT_UF2_SIZE     (CURRENT_UF2_SECTORS * BPB_SECTOR_SIZE)
+#define CURRENT_UF2_LAST_SECTOR ((UF2_FIRST_SECTOR + CURRENT_UF2_SECTORS - 1) * BPB_SECTORS_PER_CLUSTER)
+
 #define FS_START_FAT0_SECTOR      BPB_RESERVED_SECTORS
 #define FS_START_FAT1_SECTOR      (FS_START_FAT0_SECTOR + BPB_SECTORS_PER_FAT)
 #define FS_START_ROOTDIR_SECTOR   (FS_START_FAT1_SECTOR + BPB_SECTORS_PER_FAT)
@@ -323,10 +366,11 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 data[i] = 0xff;
             }
         }
+        uint32_t const current_uf2_last_sector = CURRENT_UF2_LAST_SECTOR;
         for (uint32_t i = 0; i < FAT_ENTRIES_PER_SECTOR; ++i) { // Generate the FAT chain for the firmware "file"
             uint32_t v = (sectionIdx * FAT_ENTRIES_PER_SECTOR) + i;
-            if (UF2_FIRST_SECTOR <= v && v <= UF2_LAST_SECTOR)
-                ((uint16_t *)(void *)data)[i] = v == UF2_LAST_SECTOR ? 0xffff : v + 1;
+            if (UF2_FIRST_SECTOR <= v && v <= current_uf2_last_sector)
+                ((uint16_t *)(void *)data)[i] = v == current_uf2_last_sector ? 0xffff : v + 1;
         }
     } else if (block_no < FS_START_CLUSTERS_SECTOR) { // Requested root directory sector
 
@@ -360,7 +404,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
             d->updateTime       = __DOSTIME__;
             d->updateDate       = __DOSDATE__;
             d->startCluster     = startCluster & 0xFFFF;
-            d->size = (inf->content ? strlen(inf->content) : UF2_SIZE);
+            d->size = (inf->content ? strlen(inf->content) : CURRENT_UF2_SIZE);
         }
 
     } else if (block_no < BPB_TOTAL_SECTORS) {
@@ -371,13 +415,13 @@ void read_block(uint32_t block_no, uint8_t *data) {
         } else { // generate the UF2 file data on-the-fly
             sectionIdx -= NUM_FILES - 1;
             uint32_t addr = USER_FLASH_START + (sectionIdx * UF2_FIRMWARE_BYTES_PER_SECTOR);
-            if (addr < CFG_UF2_FLASH_SIZE) {
+            if (addr < USER_FLASH_START + current_flash_size()) {
                 UF2_Block *bl = (void *)data;
                 bl->magicStart0 = UF2_MAGIC_START0;
                 bl->magicStart1 = UF2_MAGIC_START1;
                 bl->magicEnd = UF2_MAGIC_END;
                 bl->blockNo = sectionIdx;
-                bl->numBlocks = UF2_SECTORS;
+                bl->numBlocks = CURRENT_UF2_SECTORS;
                 bl->targetAddr = addr;
                 bl->payloadSize = UF2_FIRMWARE_BYTES_PER_SECTOR;
                 bl->flags = UF2_FLAG_FAMILYID;
