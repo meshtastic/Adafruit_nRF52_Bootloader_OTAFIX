@@ -28,7 +28,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set matrix
         id: set-matrix
@@ -51,13 +51,13 @@ jobs:
         board: ${{ fromJSON(needs.set-matrix.outputs.matrix) }}
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with:
         fetch-depth: 0
         submodules: true
 
     - name: Install ARM GCC
-      uses: carlosperate/arm-none-eabi-gcc-action@v1
+      uses: carlosperate/arm-none-eabi-gcc-action@98c40e51546516419841748d3210c290df0d2c6c # v1.13.0
       with:
         release: '12.3.Rel1'
 
@@ -70,14 +70,14 @@ jobs:
         make BOARD=${{ matrix.board }} all
         make BOARD=${{ matrix.board }} copy-artifact
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: ${{ matrix.board }}
         path: _bin/${{ matrix.board }}
         retention-days: ${{ github.event_name == 'release' && 90 || 1 }}
 
     - name: Upload Release Asset
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
       if: ${{ github.event_name == 'release' }}
       with:
         files: |
