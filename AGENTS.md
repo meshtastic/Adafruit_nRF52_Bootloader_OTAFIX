@@ -162,9 +162,20 @@ itself; a human has to edit it too.
   that pattern, don't replace the file.
 - **Board gaps are tracked as issues, not guessed at.** `Meshtastic-Android`
   flags `NANO_G2_ULTRA` and `NOMADSTAR_METEOR_PRO` as needing bootloader
-  upgrade support with no board here yet (issues #4, #5) — bringing up a
-  new board needs real hardware to get `UF2_BOARD_ID`/VID-PID/pin defs
-  right; don't fabricate a `board.h` without one.
+  upgrade support (issues #4, #5). Neither is hardware-confirmed yet:
+  - `NOMADSTAR_METEOR_PRO` is RAK4631-based; diffing its firmware variant
+    against plain `rak4631`'s shows only peripheral-level differences (RGB
+    LED driver chip, sensor I2C, buzzer) — nothing this bootloader touches.
+    Likely needs **no new `src/boards` entry at all**, just confirmation
+    that `wiscore_rak4631_board`'s existing UF2 flashes and boots on one
+    (see the [README's RAK4631 note](./README.md#notes-on-rak4631-bootloader)).
+  - `NANO_G2_ULTRA` needs a genuinely new board — bringing one up requires
+    real hardware to get `UF2_BOARD_ID`/VID-PID/pin defs right; don't
+    fabricate a `board.h` without at least sourcing every field from
+    somewhere real (`meshtastic/firmware`'s own variant files, the
+    vendor's PlatformIO board manifest, etc.) and flagging clearly what's
+    still unconfirmed.
+  Don't close either issue without an actual hardware test.
 - **`CURRENT.UF2` dump-and-restore used to hang the device — fixed in #20,
   don't reintroduce it.** Root cause: `CURRENT.UF2` was sized off the max
   possible app region (`TRUE_USER_FLASH_SIZE`) instead of the real

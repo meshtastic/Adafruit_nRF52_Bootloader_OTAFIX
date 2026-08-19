@@ -77,7 +77,7 @@ bootloader and SoftDevice zip package").
 - Minewsemi MX25LE01
 - Nologo ProMicro NRF52840 (aka SuperMini NRF52840)
 - RAK 3401
-- RAK 4631 ([See note](#notes-on-rak4631-bootloader))
+- RAK 4631 ([See note](#notes-on-rak4631-bootloader)) — also covers NomadStar Meteor Pro, see the same note
 - RAK WisMesh Tag
 - Seeed Studio SenseCAP Card Tracker T1000-E
 - Seeed SenseCAP Solar Node P1
@@ -220,6 +220,8 @@ If the file shows: "Board-ID: nRF52840-SeeedXiaoSense-v1" then the ***SENSE*** v
 ## Notes on RAK4631 bootloader
 
 This version of the RAK4631 bootloader is based on a much newer version (0.9.2) of the Adafruit nRF52 bootloader than what RAK Wireless uses on their official bootloader (0.6.2-11). It has been tested with no problems found; whether RAK's own patches to the Adafruit bootloader introduce any behavioral difference has not been investigated. A variant of the official RAK bootloader with these patches included instead is available [here](https://github.com/oltaco/WisCore_RAK4631_Bootloader/releases).
+
+**NomadStar Meteor Pro** is RAK4631-based hardware with an added RGBW LED and e-ink display bolted on via a WisBlock IO module. Diffing its [firmware variant](https://github.com/meshtastic/firmware/tree/master/variants/nrf52840/rak4631_nomadstar_meteor_pro) against plain RAK4631's shows only peripheral-level differences (the RGB LED driver chip, sensor I2C addresses, a buzzer pin, battery-sense calibration) — nothing this bootloader's MCU/flash/USB identity touches. It should be able to use this same RAK4631 UF2 unchanged, but **this has not been confirmed on real hardware** — if you have one, please try flashing it and report back on [issue #5](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/issues/5).
 
 ---
 
