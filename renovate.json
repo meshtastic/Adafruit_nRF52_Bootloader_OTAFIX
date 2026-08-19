@@ -8,7 +8,8 @@
     "schedule:daily",
     "group:recommended",
     "replacements:all",
-    "workarounds:all"
+    "workarounds:all",
+    "helpers:pinGitHubActionDigests"
   ],
   "baseBranchPatterns": ["master"],
   "git-submodules": {
