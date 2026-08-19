@@ -1,5 +1,7 @@
 # Meshtastic OTAFIX Bootloader
 
+[![Build](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/actions/workflows/githubci.yml/badge.svg)](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/actions/workflows/githubci.yml)
+
 Adafruit nRF52 bootloader with enhanced OTA DFU, forked for [Meshtastic](https://meshtastic.org) from [oltaco's OTAFIX bootloader](https://github.com/oltaco/Adafruit_nRF52_Bootloader_OTAFIX). This is the bootloader several nRF52-based Meshtastic devices ship with, and the one the [Meshtastic Android app](https://github.com/meshtastic/Meshtastic-Android) can upgrade in-app (see [Bootloader upgrade from the Meshtastic Android app](#bootloader-upgrade-from-the-meshtastic-android-app) below).
 
 Current release: **OTAFIX 2.2** — see [changelog.md](changelog.md) for version history.
@@ -134,3 +136,25 @@ If the file shows: "Board-ID: nRF52840-SeeedXiaoSense-v1" then the ***SENSE*** v
 ## Notes on RAK4631 bootloader
 
 This version of the RAK4631 bootloader is based on a much newer version (0.9.2) of the Adafruit nRF52 bootloader than what RAK Wireless uses on their official bootloader (0.6.2-11). It has been tested with no problems found; whether RAK's own patches to the Adafruit bootloader introduce any behavioral difference has not been investigated. A variant of the official RAK bootloader with these patches included instead is available [here](https://github.com/oltaco/WisCore_RAK4631_Bootloader/releases).
+
+---
+
+## Building locally
+
+The build is `make`-based; the `CMakeLists.txt` in this repo is incomplete — only `heltec_t114` and `thinknode_m1` have a `board.cmake`, so `cmake -DBOARD=<other board>` will fail with `BOARD is not defined`-style errors. Use `make`.
+
+```sh
+git submodule update --init --recursive
+
+python3 -m venv .venv && source .venv/bin/activate
+pip install adafruit-nrfutil uritemplate requests intelhex setuptools
+
+# ARM GCC 12.3.Rel1 is what CI pins (.github/workflows/githubci.yml).
+# Newer versions (13.x tested working, 15.x does not) can hit a
+# -Werror=array-bounds false positive in bootloader_settings.c.
+
+make BOARD=wiscore_rak4631_board all
+make BOARD=wiscore_rak4631_board copy-artifact   # writes _bin/<board>/
+```
+
+Board names are the directory names under `src/boards/`. `tools/build_all.py` builds every board and prints a pass/fail + size table — useful for checking a change against the full matrix before pushing, the same thing CI's board matrix does per-PR.
