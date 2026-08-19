@@ -82,10 +82,11 @@ keep in sync in either build system (unlike the CI matrix, see below).
 
 `main.c` is the entry point (MBR/SoftDevice handoff, DFU state machine
 dispatch). `screen.c`/`images.c` render the OLED UF2/BLE-OTA screens, active
-only when the board defines `DISPLAY_PIN_SCK` — today that's `heltec_t114`
-alone. `dfu_ble_svc.c`/`dfu_init.c` are the BLE DFU service; `flash_nrf5x.c`
-wraps flash writes. `usb/` is the USB MSC (UF2 drive) + CDC stack on top of
-the vendored `lib/tinyusb`. `cmsis/` is ARM CMSIS headers.
+only when the board defines `DISPLAY_PIN_SCK` — today that's `heltec_t096`,
+`heltec_t1`, and `heltec_t114`. `dfu_ble_svc.c`/`dfu_init.c` are the BLE DFU
+service; `flash_nrf5x.c` wraps flash writes. `usb/` is the USB MSC (UF2
+drive) + CDC stack on top of the vendored `lib/tinyusb`. `cmsis/` is ARM
+CMSIS headers.
 
 ### Vendored submodules (`lib/`)
 
@@ -118,12 +119,12 @@ submodule) — `SD_NAME`/`SD_VERSION` in `Makefile` select which one.
 ### CI (`.github/workflows/githubci.yml`)
 
 A `set-matrix` job lists `src/boards/*/` and fans out a `build` job per
-board (currently 14), on every PR and on `release: created`. Release events
+board (currently 17), on every PR and on `release: created`. Release events
 additionally upload `.zip`/`.hex`/`update-*.uf2` per board as release
 assets; PR runs just validate the compile and get 1-day artifact retention
 (release runs keep 90).
 
-Branch protection on `master` requires all 15 checks (`set-matrix` + 14
+Branch protection on `master` requires all 18 checks (`set-matrix` + 17
 `build (<board>)` contexts) by literal name. **Adding, removing, or renaming
 a board changes those context names** — branch protection does not update
 itself; a human has to edit it too.
@@ -177,3 +178,13 @@ itself; a human has to edit it too.
   verified on real RAK4631 hardware, the same dump-and-restore sequence
   that hung now completes in ~2 seconds. If you change either of those two
   files, check this still holds.
+- **Flashing the bootloader+SoftDevice package over serial DFU zeros
+  `bank_0` — the device then boots into BLE-OTA wait mode, not the app,
+  on its own.** Confirmed on real RAK4631 hardware (2026-08-19): after
+  `adafruit-nrfutil dfu serial --package <board>_bootloader-..._s140_...zip`
+  reports "Device programmed", the board goes USB-silent (no serial port,
+  no UF2 drive) because `bank_0_size` is now 0 and this bootloader's
+  documented OTAFIX 2.0+ behavior is to default to BLE-OTA rather than get
+  stuck. This is expected, not a brick: double-press reset to force UF2
+  mode and drag the app's `.uf2` across, or complete a BLE OTA DFU to the
+  same effect. Don't reflash blind expecting the app to still be running.
