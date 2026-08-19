@@ -1,10 +1,24 @@
 # Meshtastic OTAFIX Bootloader
 
 [![Build](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/actions/workflows/githubci.yml/badge.svg)](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/actions/workflows/githubci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-Adafruit nRF52 bootloader with enhanced OTA DFU, forked for [Meshtastic](https://meshtastic.org) from [oltaco's OTAFIX bootloader](https://github.com/oltaco/Adafruit_nRF52_Bootloader_OTAFIX). This is the bootloader several nRF52-based Meshtastic devices ship with, and the one the [Meshtastic Android app](https://github.com/meshtastic/Meshtastic-Android) can upgrade in-app (see [Bootloader upgrade from the Meshtastic Android app](#bootloader-upgrade-from-the-meshtastic-android-app) below).
+Adafruit nRF52 bootloader with enhanced OTA DFU, forked for [Meshtastic](https://meshtastic.org) from [oltaco's OTAFIX bootloader](https://github.com/oltaco/Adafruit_nRF52_Bootloader_OTAFIX). This is the bootloader several nRF52-based Meshtastic devices ship with, and the one the [Meshtastic Android app](https://github.com/meshtastic/Meshtastic-Android) can upgrade in-app.
 
 Current release: **OTAFIX 2.2** — see [changelog.md](changelog.md) for version history.
+
+## Contents
+
+- [Boards supported](#boards-supported)
+- [Installation](#installation)
+- [Bootloader upgrade from the Meshtastic Android app](#bootloader-upgrade-from-the-meshtastic-android-app)
+- [Troubleshooting](#troubleshooting)
+- [Recommended OTA DFU settings](#recommended-ota-dfu-settings)
+- [Notes on Xiao NRF52840 BLE](#notes-on-xiao-nrf52840-ble)
+- [Notes on RAK4631 bootloader](#notes-on-rak4631-bootloader)
+- [Contributing](#contributing)
+- [Getting help](#getting-help)
+- [License](#license)
 
 ---
 
@@ -24,14 +38,14 @@ Current release: **OTAFIX 2.2** — see [changelog.md](changelog.md) for version
 - Seeed Studio XIAO nRF52840 BLE ([See note](#notes-on-xiao-nrf52840-ble))
 - Seeed Studio XIAO nRF52840 BLE SENSE
 
-If there is another nRF52840-based Meshtastic board you would like to see supported, please raise a GitHub issue.
+If there is another nRF52840-based Meshtastic board you would like to see supported, please [raise a GitHub issue](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/issues/new/choose) — or see [Adding a new board](./CONTRIBUTING.md#adding-a-new-board) in `CONTRIBUTING.md` if you want to submit it yourself.
 
 ---
 
 ## Installation
 
 The recommended way to install the bootloader is using the UF2 file.  
-Download the UF2 file for your board (they can be found in the releases with filenames beginning with `update-`), enter UF2 mode (usually by double pressing the reset button within 0.5s) and copy the UF2 file across.
+Download the UF2 file for your board (they can be found in the [releases](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/releases) with filenames beginning with `update-`), enter UF2 mode (usually by double pressing the reset button within 0.5s) and copy the UF2 file across.
 
 If an incorrect bootloader has been flashed to the device, a full bootloader and SoftDevice zip package will need to be flashed using ``adafruit-nrfutil``.
 
@@ -139,22 +153,20 @@ This version of the RAK4631 bootloader is based on a much newer version (0.9.2) 
 
 ---
 
-## Building locally
+## Contributing
 
-The build is `make`-based; the `CMakeLists.txt` in this repo is incomplete — only `heltec_t114` and `thinknode_m1` have a `board.cmake`, so `cmake -DBOARD=<other board>` will fail with `BOARD is not defined`-style errors. Use `make`.
+Want to build from source, add a board, or submit a fix? See
+[`CONTRIBUTING.md`](./CONTRIBUTING.md) for the development setup and PR
+process, and [`AGENTS.md`](./AGENTS.md) for how the codebase is put
+together.
 
-```sh
-git submodule update --init --recursive
+## Getting help
 
-python3 -m venv .venv && source .venv/bin/activate
-pip install adafruit-nrfutil uritemplate requests intelhex setuptools
+- **Questions or troubleshooting:** [Meshtastic Discussions](https://github.com/orgs/meshtastic/discussions)
+- **Bug reports and feature requests:** [open an issue](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/issues/new/choose)
+- **Security vulnerabilities:** see [`SECURITY.md`](./SECURITY.md) — please do not open a public issue
+- **General Meshtastic docs:** [meshtastic.org](https://meshtastic.org/)
 
-# ARM GCC 12.3.Rel1 is what CI pins (.github/workflows/githubci.yml).
-# Newer versions (13.x tested working, 15.x does not) can hit a
-# -Werror=array-bounds false positive in bootloader_settings.c.
+## License
 
-make BOARD=wiscore_rak4631_board all
-make BOARD=wiscore_rak4631_board copy-artifact   # writes _bin/<board>/
-```
-
-Board names are the directory names under `src/boards/`. `tools/build_all.py` builds every board and prints a pass/fail + size table — useful for checking a change against the full matrix before pushing, the same thing CI's board matrix does per-PR.
+[MIT](./LICENSE), originally Copyright (c) 2016 Adafruit Industries.

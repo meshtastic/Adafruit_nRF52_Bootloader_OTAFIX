@@ -7,9 +7,10 @@ Canonical guidance for AI coding agents and maintainers working in this repo.
 
 1. `README.md` — boards supported, installation, the Meshtastic Android
    in-app upgrade flow, troubleshooting.
-2. `changelog.md` — OTAFIX version history (2.1/2.2 at the top; everything
+2. `CONTRIBUTING.md` — dev setup, PR process, adding a new board.
+3. `changelog.md` — OTAFIX version history (2.1/2.2 at the top; everything
    below predates the OTAFIX fork).
-3. The design invariants and gotchas below — do not violate them.
+4. The design invariants and gotchas below — do not violate them.
 
 ## What this is
 

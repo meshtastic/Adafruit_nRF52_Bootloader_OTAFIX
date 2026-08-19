@@ -10,46 +10,77 @@ body:
 
   - type: dropdown
     attributes:
-      label: Operating System
+      label: Board
       options:
-              - Linux
-              - MacOS
-              - RaspberryPi OS
-              - Windows 7
-              - Windows 10
-              - Windows 11
-              - Others
+        - Elecrow ThinkNode M1
+        - Elecrow ThinkNode M3
+        - Elecrow ThinkNode M6
+        - Heltec Automation Mesh Node T114
+        - LilyGO T-Echo
+        - Minewsemi MX25LE01
+        - Nologo ProMicro NRF52840 (SuperMini NRF52840)
+        - RAK 4631
+        - RAK WisMesh Tag
+        - Seeed Studio SenseCAP Card Tracker T1000-E
+        - Seeed SenseCAP Solar Node P1
+        - Seeed Studio Wio Tracker L1
+        - Seeed Studio XIAO nRF52840 BLE
+        - Seeed Studio XIAO nRF52840 BLE SENSE
+        - Other / not listed
     validations:
       required: true
+
+  - type: input
+    attributes:
+      label: How did you flash/update the bootloader?
+      placeholder: e.g. Meshtastic Android app (USB), manual UF2 copy, adafruit-nrfutil, nRF Connect OTA
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Operating System (of the computer/phone used to flash, if applicable)
+      options:
+        - Linux
+        - macOS
+        - Windows 10
+        - Windows 11
+        - Android
+        - iOS
+        - Not applicable
+        - Others
+    validations:
+      required: false
 
   - type: textarea
     attributes:
       label: INFO_UF2.TXT
+      description: Enter UF2 mode (double-press reset) and paste the contents of INFO_UF2.TXT from the mounted drive — it identifies the exact bootloader version and board.
       placeholder: Paste your INFO_UF2.TXT contents here
     validations:
       required: true
 
   - type: textarea
     attributes:
-      label: What happened ?
+      label: What happened?
       placeholder: A clear and concise description of what the bug is.
     validations:
       required: true
 
   - type: textarea
     attributes:
-      label: How to reproduce ?
+      label: How to reproduce?
       placeholder: |
         1. Go to '...'
         2. Click on '....'
-        3. See error      
+        3. See error
     validations:
       required: true
 
   - type: textarea
     attributes:
       label: Debug Log
-      placeholder: Debug log attached txt file.
+      placeholder: Debug log attached as a txt file.
     validations:
       required: false
 

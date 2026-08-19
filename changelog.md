@@ -1,5 +1,8 @@
 # Adafruit nRF52 Bootloader Changelog
 
+OTAFIX 2.1 and 2.2 are Meshtastic's fork; everything from 0.6.2 down predates
+it and is upstream Adafruit history, kept for provenance.
+
 ## OTAFIX 2.2
 
 - Use maximum TX power for BLE: BLE TX power set to +8 for nRF52840.
