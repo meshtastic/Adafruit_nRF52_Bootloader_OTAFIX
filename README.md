@@ -11,6 +11,7 @@ Current release: **OTAFIX 2.2** — see [changelog.md](changelog.md) for version
 
 - [How this fits together](#how-this-fits-together)
 - [Boards supported](#boards-supported)
+- [BLE advertising names](#ble-advertising-names)
 - [Installation](#installation)
 - [Bootloader upgrade from the Meshtastic Android app](#bootloader-upgrade-from-the-meshtastic-android-app)
 - [Troubleshooting](#troubleshooting)
@@ -69,10 +70,13 @@ bootloader and SoftDevice zip package").
 - Elecrow ThinkNode M1
 - Elecrow ThinkNode M3
 - Elecrow ThinkNode M6
-- Heltec Automation Mesh Node T114 / HT-nRF5262
+- Heltec T096
+- Heltec T1
+- Heltec T114 / HT-nRF5262
 - LilyGO T-Echo
 - Minewsemi MX25LE01
 - Nologo ProMicro NRF52840 (aka SuperMini NRF52840)
+- RAK 3401
 - RAK 4631 ([See note](#notes-on-rak4631-bootloader))
 - RAK WisMesh Tag
 - Seeed Studio SenseCAP Card Tracker T1000-E
@@ -82,6 +86,29 @@ bootloader and SoftDevice zip package").
 - Seeed Studio XIAO nRF52840 BLE SENSE
 
 If there is another nRF52840-based Meshtastic board you would like to see supported, please [raise a GitHub issue](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/issues/new/choose) — or see [Adding a new board](./CONTRIBUTING.md#adding-a-new-board) in `CONTRIBUTING.md` if you want to submit it yourself.
+
+## BLE advertising names
+
+When in OTA DFU mode, devices advertise using a board-specific name rather than the generic `AdaDFU`.
+
+| Board                        | OTA DFU advertising name |
+| ---------------------------- | ------------------------ |
+| Elecrow ThinkNode M1         | `TNM1_DFU`               |
+| Elecrow ThinkNode M3         | `TNM3_DFU`               |
+| Elecrow ThinkNode M6         | `TNM6_DFU`               |
+| Heltec T096                  | `T096_DFU`               |
+| Heltec T1                    | `T1_DFU`                 |
+| Heltec T114                  | `T114_DFU`               |
+| LILYGO T-Echo                | `LGTE_DFU`               |
+| Minewsemi MX25LE01           | `MX25_DFU`               |
+| ProMicro NRF52840            | `PROM_DFU`               |
+| RAK 4631                     | `4631_DFU`               |
+| RAK 3401                     | `3401_DFU`               |
+| RAK WisMesh Tag              | `RTAG_DFU`               |
+| Seeed SenseCAP Solar Node P1 | `SCAP_DFU`               |
+| Seeed T1000e                 | `T1KE_DFU`               |
+| Seeed WioTracker L1          | `WTL1_DFU`               |
+| XIAO NRF52 BLE / SENSE       | `XIAO_DFU`               |
 
 ---
 

@@ -67,8 +67,9 @@ Each board directory can carry:
   `src/screen.c`.
 - `board.mk` — Makefile board config (`MCU_SUB_VARIANT`, per-board
   `CFLAGS` like the BLE `DEVICE_NAME`).
-- `board.cmake` — **only exists for 2 of 14 boards** (`heltec_t114`,
-  `thinknode_m1`). `cmake -DBOARD=<anything else>` fails outright. Nobody
+- `board.cmake` — **only exists for 4 of 17 boards** (`heltec_t096`,
+  `heltec_t1`, `heltec_t114`, `thinknode_m1`). `cmake -DBOARD=<anything
+  else>` fails outright. Nobody
   uses the CMake path in practice (CI and `tools/build_all.py` both use
   `make`); don't assume feature parity between the two build systems.
 - `pinconfig.c` — present on some boards, board-specific pin table.
