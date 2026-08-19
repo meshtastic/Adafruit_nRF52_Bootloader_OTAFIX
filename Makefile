@@ -194,7 +194,6 @@ C_SRC += \
 	$(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c \
 	$(TUSB_PATH)/common/tusb_fifo.c \
 	$(TUSB_PATH)/device/usbd.c \
-	$(TUSB_PATH)/device/usbd_control.c \
 	$(TUSB_PATH)/class/cdc/cdc_device.c \
 	$(TUSB_PATH)/class/msc/msc_device.c \
 	$(TUSB_PATH)/tusb.c
