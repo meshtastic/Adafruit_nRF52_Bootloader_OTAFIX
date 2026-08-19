@@ -8,6 +8,10 @@ on:
     types:
       - created
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   set-matrix:
     runs-on: ubuntu-latest
@@ -57,6 +61,7 @@ jobs:
       with:
         name: ${{ matrix.board }}
         path: _bin/${{ matrix.board }}
+        retention-days: ${{ github.event_name == 'release' && 90 || 1 }}
 
     - name: Upload Release Asset
       uses: softprops/action-gh-release@v1
