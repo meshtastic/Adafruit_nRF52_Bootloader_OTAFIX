@@ -7,9 +7,10 @@ Canonical guidance for AI coding agents and maintainers working in this repo.
 
 1. `README.md` — boards supported, installation, the Meshtastic Android
    in-app upgrade flow, troubleshooting.
-2. `changelog.md` — OTAFIX version history (2.1/2.2 at the top; everything
+2. `CONTRIBUTING.md` — dev setup, PR process, adding a new board.
+3. `changelog.md` — OTAFIX version history (2.1/2.2 at the top; everything
    below predates the OTAFIX fork).
-3. The design invariants and gotchas below — do not violate them.
+4. The design invariants and gotchas below — do not violate them.
 
 ## What this is
 
@@ -29,9 +30,8 @@ This is C, built with a bare Makefile (the supported path) or `CMakeLists.txt`
 
 ## Build
 
-In the workspace, `nix develop .#otafix` gives you the full toolchain and
-prints these same steps. Outside the workspace, you need `arm-none-eabi-gcc`
-(CI pins **12.3.Rel1** exactly — see the toolchain gotcha below) and Python 3.
+You need `arm-none-eabi-gcc` (CI pins **12.3.Rel1** exactly — see the
+toolchain gotcha below) and Python 3.
 
 ```sh
 git submodule update --init --recursive   # lib/nrfx, lib/tinyusb, lib/uf2 — required, not vendored inline
@@ -109,21 +109,13 @@ itself; a human has to edit it too.
 
 ## Gotchas
 
-- **ARM GCC version matters.** CI pins exactly `12.3.Rel1`. The nixpkgs
-  default (`gcc-arm-embedded`, 15.2.rel1 as of 2026-08) fails with
-  `-Werror=array-bounds` in
+- **ARM GCC version matters.** CI pins exactly `12.3.Rel1`. Much newer
+  toolchains (verified: 15.2.Rel1) fail with `-Werror=array-bounds` in
   `lib/sdk11/components/libraries/bootloader_dfu/bootloader_settings.c`
   (a false positive from newer GCC's stricter analysis of a fixed
-  MBR-address read) — verified by actually building with it.
-  `gcc-arm-embedded-13` (13.3.rel1) compiles clean and is what the
-  workspace's `.#otafix` shell uses, being the closest verified-working
-  version nixpkgs currently carries.
-- **`uv pip install` ignores an activated venv if `UV_PYTHON` is set** —
-  it targets that interpreter directly and fails with "externally managed"
-  against the read-only Nix store path. The workspace shell deliberately
-  does not set `UV_PYTHON` here, unlike the main `.#python` shell (which
-  has lock files that need a pinned interpreter for reproducibility; this
-  repo has none).
+  MBR-address read) — verified by actually building with it. 13.3.Rel1
+  compiles clean and is the closest verified-working version if you can't
+  get the exact CI-pinned one.
 - **MeshCore/Ripple content has been deliberately removed** from the docs
   (README, changelog) — this is Meshtastic's own branded fork now, not a
   place to re-add other companion-firmware documentation. If you're
