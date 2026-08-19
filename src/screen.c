@@ -203,15 +203,21 @@ static void printicon(int x, int y, int color, const uint8_t* icon) {
 }
 
 static void print(int x, int y, int color, const char* text, int size) {
+  // Glyphs are written straight into frame_buf with no bounds check of
+  // their own, so reject anything that would land outside it.
+  if (y < 0 || y + 8 * size > DISPLAY_HEIGHT) {
+    return;
+  }
   while (*text) {
     char c = *text++;
+    if (c < ' ' || c >= 0x7f) c = '?';
     c -= ' ';
-    printch(x, y, color, &font8[c * 6], size);
-    x += CHAR_ADV(size);
-    if (x + CHAR_INK(size) > DISPLAY_WIDTH) {
-      // Next char won't fit.
+    if (x < 0 || x + CHAR_INK(size) > DISPLAY_WIDTH) {
+      // This char won't fit.
       return;
     }
+    printch(x, y, color, &font8[c * 6], size);
+    x += CHAR_ADV(size);
   }
 }
 

@@ -83,7 +83,7 @@
 #define DISPLAY_VSCSAD        0
 
 #define DISPLAY_TITLE         "T096"
-#define BANNER_TEXT           "https://github.com/oltaco"
+#define BANNER_TEXT           "meshtastic.org - OTAFIX"
 #define FONT_SIZE_LARGE       3
 #define NOLABELS
 
