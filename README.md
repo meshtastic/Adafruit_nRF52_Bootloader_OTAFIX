@@ -19,6 +19,7 @@ Current release: **OTAFIX 2.5** — see [changelog.md](changelog.md) for version
 - [Notes on Xiao NRF52840 BLE](#notes-on-xiao-nrf52840-ble)
 - [Notes on RAK4631 bootloader](#notes-on-rak4631-bootloader)
 - [Notes on MeshTracker X1 DFU mode](#notes-on-meshtracker-x1-dfu-mode)
+- [Notes on Nano G2 Ultra](#notes-on-nano-g2-ultra)
 - [Contributing](#contributing)
 - [Getting help](#getting-help)
 - [License](#license)
@@ -72,6 +73,7 @@ bootloader and SoftDevice zip package").
 ---
 
 ## Boards supported
+- BQ Nano G2 Ultra ([See note](#notes-on-nano-g2-ultra))
 - Elecrow ThinkNode M1
 - Elecrow ThinkNode M3
 - Elecrow ThinkNode M6
@@ -245,6 +247,15 @@ Because a momentary press belongs to the application, a short press will *not* e
 To leave DFU mode, eject the mounted drive: the bootloader exits DFU and boots the application. There is no RESET button to fall back on, so this is the way out if you entered DFU and no longer want to copy firmware across. (Copying a `.uf2` across also reboots the board, as on any other board.) It has to be a real eject — `eject`, `udisksctl power-off`, or Finder/Explorer "Safely Remove" — since the bootloader only sees an eject as a SCSI START STOP UNIT.
 
 Unplugging is not a way out. The board stays in the bootloader on battery, with no LED to show it, and boots the application when you next plug it in.
+
+## Notes on Nano G2 Ultra
+
+Support for this board was added without access to the physical hardware — it builds and links cleanly, but **has not been tested on a real device**. Two things in particular need confirming before relying on it:
+
+- The board appears to have no onboard LED (none found in the [firmware variant's](https://github.com/meshtastic/firmware/tree/master/variants/nrf52840/nano-g2-ultra) pin definitions), so this bootloader's UF2/BLE-OTA status is reported via the board's screen only — not supported by this bootloader today — meaning there's currently no visual status feedback in bootloader mode at all.
+- The board's single physical button is wired to both button slots this bootloader requires (see `src/boards/nano_g2_ultra/board.h`), and its USB PID was picked to avoid colliding with other boards in this repo rather than confirmed against a real allocation.
+
+If you have this hardware, please try it and report back on [the tracking issue](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/issues/4).
 
 ---
 
