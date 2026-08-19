@@ -158,3 +158,14 @@ itself; a human has to edit it too.
   upgrade support with no board here yet (issues #4, #5) — bringing up a
   new board needs real hardware to get `UF2_BOARD_ID`/VID-PID/pin defs
   right; don't fabricate a `board.h` without one.
+- **`CURRENT.UF2` (the UF2-drive file `ghostfat.c` generates live from the
+  already-flashed app region) does not round-trip cleanly.** Copying it off
+  as a backup works fine, but copying it straight back to "restore" the app
+  it came from can leave the device booting into a hung app (frozen
+  display, no LED activity) even though the bytes are identical to what
+  was there before — something about bootloader-settings/app-valid state
+  isn't fully reconciled by that path. Confirmed on real RAK4631 hardware
+  during the nrfx/tinyusb bump testing (PR #19). A real release UF2 or a
+  normal OTA-DFU flash both round-trip fine; only the raw dump-and-rewrite
+  doesn't. Untriaged — if you hit this, a fresh release UF2 is the
+  workaround, not a bootloader-settings-format bug hunt mid-task.
