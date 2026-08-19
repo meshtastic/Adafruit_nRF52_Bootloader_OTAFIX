@@ -19,10 +19,7 @@ recover — so a few things here are stricter than a typical repo.
 
 ## Building locally
 
-If you're working from a Nix-based Meshtastic dev workspace, a
-`nix develop .#otafix` style shell can provide the full toolchain and print
-these same steps. Otherwise, you need `arm-none-eabi-gcc` and Python 3
-installed yourself.
+You need `arm-none-eabi-gcc` and Python 3 installed.
 
 ```sh
 git submodule update --init --recursive   # lib/nrfx, lib/tinyusb, lib/uf2 — required, not vendored inline
