@@ -5,7 +5,7 @@
 
 Adafruit nRF52 bootloader with enhanced OTA DFU, forked for [Meshtastic](https://meshtastic.org) from [oltaco's OTAFIX bootloader](https://github.com/oltaco/Adafruit_nRF52_Bootloader_OTAFIX). This is the bootloader several nRF52-based Meshtastic devices ship with, and the one the [Meshtastic Android app](https://github.com/meshtastic/Meshtastic-Android) can upgrade in-app.
 
-Current release: **OTAFIX 2.2** — see [changelog.md](changelog.md) for version history.
+Current release: **OTAFIX 2.3** — see [changelog.md](changelog.md) for version history.
 
 ## Contents
 
