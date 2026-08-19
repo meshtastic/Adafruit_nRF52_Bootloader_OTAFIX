@@ -5,12 +5,18 @@ Canonical guidance for AI coding agents and maintainers working in this repo.
 
 ## First read
 
-1. `README.md` — boards supported, installation, the Meshtastic Android
-   in-app upgrade flow, troubleshooting.
-2. `CONTRIBUTING.md` — dev setup, PR process, adding a new board.
-3. `changelog.md` — OTAFIX version history (2.1/2.2 at the top; everything
+1. [README.md's "How this fits together"](./README.md#how-this-fits-together)
+   — the boot chain (MBR → this bootloader → SoftDevice → application), why
+   this repo is only the bootloader and not the Meshtastic application
+   itself, and the three ways a new image gets installed (UF2, serial DFU,
+   BLE OTA DFU). Read this before touching `main.c` or `usb/` — the
+   Architecture section below assumes it.
+2. The rest of `README.md` — boards supported, installation, the Meshtastic
+   Android in-app upgrade flow, troubleshooting.
+3. `CONTRIBUTING.md` — dev setup, PR process, adding a new board.
+4. `changelog.md` — OTAFIX version history (2.1/2.2 at the top; everything
    below predates the OTAFIX fork).
-4. The design invariants and gotchas below — do not violate them.
+5. The design invariants and gotchas below — do not violate them.
 
 ## What this is
 

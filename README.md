@@ -9,6 +9,7 @@ Current release: **OTAFIX 2.2** — see [changelog.md](changelog.md) for version
 
 ## Contents
 
+- [How this fits together](#how-this-fits-together)
 - [Boards supported](#boards-supported)
 - [Installation](#installation)
 - [Bootloader upgrade from the Meshtastic Android app](#bootloader-upgrade-from-the-meshtastic-android-app)
@@ -19,6 +20,48 @@ Current release: **OTAFIX 2.2** — see [changelog.md](changelog.md) for version
 - [Contributing](#contributing)
 - [Getting help](#getting-help)
 - [License](#license)
+
+---
+
+## How this fits together
+
+This repo builds **only the bootloader** — the small program that runs
+before anything else on the device. It does not contain the Meshtastic
+application (the LoRa mesh, BLE, and display code); that's built entirely
+separately in [`meshtastic/firmware`](https://github.com/meshtastic/firmware).
+This bootloader's job is just to start that application, or, when asked,
+replace it (or itself) with a new version.
+
+On every power-up or reset, a tiny fixed piece of code at the very start of
+flash — Nordic's **MBR** — hands off to this bootloader. From there, the
+bootloader either:
+
+- boots straight into the installed Meshtastic application, or
+- if no valid application is installed, or the user has asked for it, waits
+  for a new one.
+
+A new application image — or occasionally the bootloader itself — can be
+installed three different ways:
+
+| Method | Transport | Typical use |
+|---|---|---|
+| **UF2 drag-and-drop** | USB, appears as a drive | Manual flashing — see [Installation](#installation) |
+| **Serial DFU** | USB, appears as a serial port | Recovery, and flashing a full bootloader+SoftDevice package with `adafruit-nrfutil` — see [Installation](#installation) |
+| **BLE OTA DFU** | Bluetooth, no cable needed | The Meshtastic Android app's firmware/bootloader update, and any Nordic DFU app — see [below](#bootloader-upgrade-from-the-meshtastic-android-app) and [recommended settings](#recommended-ota-dfu-settings) |
+
+BLE OTA DFU is the only *wireless* path, which is what the "OTA" in
+"OTAFIX" refers to — and it's also the bootloader's default fallback: since
+**OTAFIX 2.0**, if no valid application is present, the device waits in BLE
+OTA mode automatically rather than risk getting stuck (see
+[Troubleshooting](#troubleshooting)).
+
+The application also relies on Nordic's **SoftDevice** — a closed-source,
+precompiled Bluetooth stack (vendored here as a hex blob under
+`lib/softdevice/`) that sits in flash alongside it. The bootloader and the
+application both call into it for BLE, so bootloader and SoftDevice
+versions are usually flashed together as a matched pair (that's why the
+[Installation](#installation) instructions below mention flashing "a full
+bootloader and SoftDevice zip package").
 
 ---
 
