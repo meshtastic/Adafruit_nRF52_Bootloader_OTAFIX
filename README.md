@@ -1,5 +1,14 @@
 # Adafruit nRF52 Bootloader with Enhanced OTA DFU
 
+## Changes in OTAFIX 2.3
+- **ST7735 Display support**  
+  Added ST7735 display driver and refactored display code to allow for configuring different display sizes at the board level.  
+
+- **New boards**  
+  Heltec T096  
+  Heltec T1  
+  RAK 3401  
+
 ## Changes in OTAFIX 2.2
 
 - **Use maximum TX power for BLE**  
@@ -32,32 +41,22 @@
   When connected to a USB host, devices now automatically reboot into the application after a successful OTA update, instead of requiring a manual reset.
 
 - **Unique BLE advertising names per board**  
-  In OTA DFU mode, devices advertise using a board-specific name instead of the generic `AdaDFU`:
-  - **Elecrow ThinkNode M1** → `TNM1_DFU`
-  - **Elecrow ThinkNode M3** → `TNM3_DFU`
-  - **Elecrow ThinkNode M6** → `TNM6_DFU`
-  - **Heltec T114** → `T114_DFU`
-  - **LILYGO T-Echo** → `LGTE_DFU`
-  - **Minewsemi MX25LE01** → `MX25_DFU`
-  - **ProMicro NRF52840** → `PROM_DFU`
-  - **RAK 4631** → `4631_DFU`
-  - **RAK WisMesh Tag** → `RTAG_DFU`
-  - **Seeed SenseCAP Solar Node P1** → `SCAP_DFU`
-  - **Seeed T1000e** → `T1KE_DFU`
-  - **Seeed WioTracker L1** → `WTL1_DFU`
-  - **XIAO NRF52 BLE / SENSE** → `XIAO_DFU`
-
+  In OTA DFU mode, devices advertise using a board-specific name instead of the generic `AdaDFU`.  
+  See the [BLE advertising names](#ble-advertising-names) section for the current names.  
 ---
 
 ## Boards supported
 - Elecrow ThinkNode M1
 - Elecrow ThinkNode M3
 - Elecrow ThinkNode M6
-- Heltec Automation Mesh Node T114 / HT-nRF5262
+- Heltec T096
+- Heltec T1
+- Heltec T114 / HT-nRF5262
 - LilyGO T-Echo
 - Minewsemi MX25LE01
 - Nologo ProMicro NRF52840 (aka SuperMini NRF52840)
-- RAK 4631 ([See note](#notes-on-RAK4631-bootloader))
+- RAK 4631
+- RAK 3401
 - RAK WisMesh Tag
 - Seeed Studio SenseCAP Card Tracker T1000-E
 - Seeed SenseCAP Solar Node P1
@@ -66,6 +65,29 @@
 - Seeed Studio XIAO nRF52840 BLE SENSE
 
 If there is another nRF52840-based board you would like to see supported please raise a github issue and we can make it happen.
+## BLE advertising names
+
+When in OTA DFU mode, devices advertise using a board-specific name rather than the generic `AdaDFU`.
+
+| Board                        | OTA DFU advertising name |
+| ---------------------------- | ------------------------ |
+| Elecrow ThinkNode M1         | `TNM1_DFU`               |
+| Elecrow ThinkNode M3         | `TNM3_DFU`               |
+| Elecrow ThinkNode M6         | `TNM6_DFU`               |
+| Heltec T096                  | `T096_DFU`               |
+| Heltec T1                    | `T1_DFU`                 |
+| Heltec T114                  | `T114_DFU`               |
+| LILYGO T-Echo                | `LGTE_DFU`               |
+| Minewsemi MX25LE01           | `MX25_DFU`               |
+| ProMicro NRF52840            | `PROM_DFU`               |
+| RAK 4631                     | `4631_DFU`               |
+| RAK 3401                     | `3401_DFU`               |
+| RAK WisMesh Tag              | `RTAG_DFU`               |
+| Seeed SenseCAP Solar Node P1 | `SCAP_DFU`               |
+| Seeed T1000e                 | `T1KE_DFU`               |
+| Seeed WioTracker L1          | `WTL1_DFU`               |
+| XIAO NRF52 BLE / SENSE       | `XIAO_DFU`               |
+
 
 ---
 
@@ -183,9 +205,3 @@ To check:
 2. Open the `INFO_UF2.TXT` file on the mounted drive  
 
 If the file shows: "Board-ID: nRF52840-SeeedXiaoSense-v1" then you must install the ***SENSE*** variant if updating via UF2 file.
-
-## Notes on RAK4631 bootloader
-
-This version of the RAK4631 bootloader is based on a much newer version (0.9.2) of the Adafruit nRF52 bootloader than what RAK Wireless uses on their official bootloader (0.6.2-11).  
-
-I haven't looked to see what changes (if any) that RAK made to the Adafruit bootloader, so I'm not sure if there's any difference but I have tested this bootloader and I haven't found any problems thus far. If you would rather use the original RAK bootloader but with these patches included you can find that [here](https://github.com/oltaco/WisCore_RAK4631_Bootloader/releases).
