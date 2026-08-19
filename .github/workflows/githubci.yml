@@ -8,6 +8,15 @@ on:
     types:
       - created
 
+# The repo's default is write (checked via `gh api .../actions/permissions/workflow`),
+# so every job here would otherwise get a write-capable GITHUB_TOKEN even
+# though only the release-asset upload needs one — and this workflow now
+# runs on every PR, including from forks. contents:write is scoped to the
+# one job that needs it (the release step, gated separately by
+# `if: github.event_name == 'release'`); everything else gets read-only.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -32,6 +41,10 @@ jobs:
   build:
     needs: set-matrix
     runs-on: ubuntu-latest
+    # Only this job's release step needs write access (softprops/action-gh-release
+    # creating/updating release assets); PR runs never reach that step.
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
