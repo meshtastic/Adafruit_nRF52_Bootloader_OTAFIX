@@ -1,7 +1,21 @@
 # Adafruit nRF52 Bootloader Changelog
 
-OTAFIX 2.1 and 2.2 are Meshtastic's fork; everything from 0.6.2 down predates
+OTAFIX 2.1–2.3 are Meshtastic's fork; everything from 0.6.2 down predates
 it and is upstream Adafruit history, kept for provenance.
+
+## OTAFIX 2.3
+
+- New boards: Heltec T096, Heltec T1, RAK 3401 (merged from oltaco's upstream, which calls this same board-support work "OTAFIX 2.3" too).
+- `screen.c` refactored to a display-size-agnostic layout (macro-based bar/text positions instead of hardcoded pixel offsets) — no behavior change for existing boards, needed for the new boards' smaller displays.
+- ST7735 display controller support, alongside the existing ST7789 path.
+- Backported five upstream Adafruit fixes, hardware-validated on a RAK4631:
+  - Boot loop from a wrong REGOUT0 read.
+  - GCC 15 build errors (Makefile version filter, `ghostfat.c`).
+  - `-Werror=array-bounds` false positive in `bootloader_settings.c`, replaced with a scoped pragma instead of the previous repo-wide `--param=min-pagesize=0` workaround.
+  - Clear CONTROL/PRIMASK/BASEPRI/FAULTMASK before jumping to the application — was rarely causing lockups.
+  - Wait for BLE notification-queue room instead of silently dropping DFU completion notifications.
+- Fixed a latent out-of-bounds write in `screen.c`'s `print()`: it drew a glyph before checking whether it fit on screen, rather than after. Not reachable on any current board, but a real hazard for future `board.h` layouts.
+- `AGENTS.md` gotcha: flashing the bootloader+SoftDevice package over serial DFU zeros `bank_0`, so the device intentionally comes up in BLE-OTA wait mode instead of the app on the next boot — not a brick.
 
 ## OTAFIX 2.2
 
