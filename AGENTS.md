@@ -158,14 +158,15 @@ itself; a human has to edit it too.
   upgrade support with no board here yet (issues #4, #5) — bringing up a
   new board needs real hardware to get `UF2_BOARD_ID`/VID-PID/pin defs
   right; don't fabricate a `board.h` without one.
-- **`CURRENT.UF2` (the UF2-drive file `ghostfat.c` generates live from the
-  already-flashed app region) does not round-trip cleanly.** Copying it off
-  as a backup works fine, but copying it straight back to "restore" the app
-  it came from can leave the device booting into a hung app (frozen
-  display, no LED activity) even though the bytes are identical to what
-  was there before — something about bootloader-settings/app-valid state
-  isn't fully reconciled by that path. Confirmed on real RAK4631 hardware
-  during the nrfx/tinyusb bump testing (PR #19). A real release UF2 or a
-  normal OTA-DFU flash both round-trip fine; only the raw dump-and-rewrite
-  doesn't. Untriaged — if you hit this, a fresh release UF2 is the
-  workaround, not a bootloader-settings-format bug hunt mid-task.
+- **`CURRENT.UF2` dump-and-restore used to hang the device — fixed in #20,
+  don't reintroduce it.** Root cause: `CURRENT.UF2` was sized off the max
+  possible app region (`TRUE_USER_FLASH_SIZE`) instead of the real
+  installed app, AND `msc_uf2.c`'s UF2-app-flash completion path never
+  recorded the real app size into `bootloader_settings.bank_0_size` (stayed
+  0 from a `memset`, only the DFU-serial protocol populated it). Together
+  that meant restoring a `CURRENT.UF2` dump byte-for-byte could still hang
+  the device on boot. Both fixed together in #20 (`ghostfat.c`'s
+  `current_flash_size()` + `msc_uf2.c`'s `update_status.app_size`) —
+  verified on real RAK4631 hardware, the same dump-and-restore sequence
+  that hung now completes in ~2 seconds. If you change either of those two
+  files, check this still holds.
