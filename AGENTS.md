@@ -129,13 +129,14 @@ itself; a human has to edit it too.
 
 ## Gotchas
 
-- **ARM GCC version matters.** CI pins exactly `12.3.Rel1`. Much newer
-  toolchains (verified: 15.2.Rel1) fail with `-Werror=array-bounds` in
-  `lib/sdk11/components/libraries/bootloader_dfu/bootloader_settings.c`
-  (a false positive from newer GCC's stricter analysis of a fixed
-  MBR-address read) — verified by actually building with it. 13.3.Rel1
+- **ARM GCC version matters.** CI pins exactly `12.3.Rel1`; 13.3.Rel1 also
   compiles clean and is the closest verified-working version if you can't
-  get the exact CI-pinned one.
+  get the exact CI-pinned one. GCC 15 used to fail with
+  `-Werror=array-bounds` in
+  `lib/sdk11/components/libraries/bootloader_dfu/bootloader_settings.c`
+  (a false positive on a fixed MBR-address read); Adafruit's fix
+  (`6b24be5`, a localised `#pragma GCC diagnostic`) is backported, but
+  nobody has rebuilt here with GCC 15 since — if you do, update this note.
 - **MeshCore/Ripple content has been deliberately removed** from the docs
   (README, changelog) — this is Meshtastic's own branded fork now, not a
   place to re-add other companion-firmware documentation. If you're

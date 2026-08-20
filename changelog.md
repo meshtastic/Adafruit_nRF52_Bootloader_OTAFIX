@@ -3,6 +3,14 @@
 OTAFIX 2.1 and 2.2 are Meshtastic's fork; everything from 0.6.2 down predates
 it and is upstream Adafruit history, kept for provenance.
 
+## Unreleased
+
+- Backported from Adafruit mainline (0.10.0/0.11.0 era; see #25):
+  - Fix boot loop caused by reading the wrong value from `REGOUT0`.
+  - Clear pending interrupts and exceptions before jumping to the application (rare lockups).
+  - Wait for BLE notification-queue room instead of dropping DFU completion notifications.
+  - GCC 15 build fixes (`Makefile`, `ghostfat.c`, `bootloader_settings.c`).
+
 ## OTAFIX 2.2
 
 - Use maximum TX power for BLE: BLE TX power set to +8 for nRF52840.
