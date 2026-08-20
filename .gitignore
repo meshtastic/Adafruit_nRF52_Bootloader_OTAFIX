@@ -69,3 +69,9 @@ Makefile.user
 
 # Exclude all SoftDevice S340 files
 lib/softdevice/s340*
+_bin/
+venv/
+.python-version
+lib/python3.13/
+lib64
+pyvenv.cfg

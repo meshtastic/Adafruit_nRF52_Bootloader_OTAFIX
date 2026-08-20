@@ -1,13 +1,21 @@
 name: Build
 
 on:
-  workflow_dispatch:
   pull_request:
-  push:
-    branches: [ master ]
+  #  push:
+  #  repository_dispatch:
   release:
     types:
       - created
+
+# The repo's default is write (checked via `gh api .../actions/permissions/workflow`),
+# so every job here would otherwise get a write-capable GITHUB_TOKEN even
+# though only the release-asset upload needs one — and this workflow now
+# runs on every PR, including from forks. contents:write is scoped to the
+# one job that needs it (the release step, gated separately by
+# `if: github.event_name == 'release'`); everything else gets read-only.
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,7 +28,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set matrix
         id: set-matrix
@@ -33,19 +41,23 @@ jobs:
   build:
     needs: set-matrix
     runs-on: ubuntu-latest
+    # Only this job's release step needs write access (softprops/action-gh-release
+    # creating/updating release assets); PR runs never reach that step.
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
         board: ${{ fromJSON(needs.set-matrix.outputs.matrix) }}
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         fetch-depth: 0
         submodules: true
 
     - name: Install ARM GCC
-      uses: carlosperate/arm-none-eabi-gcc-action@v1
+      uses: carlosperate/arm-none-eabi-gcc-action@98c40e51546516419841748d3210c290df0d2c6c # v1.13.0
       with:
         release: '12.3.Rel1'
 
@@ -58,13 +70,14 @@ jobs:
         make BOARD=${{ matrix.board }} all
         make BOARD=${{ matrix.board }} copy-artifact
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: ${{ matrix.board }}
         path: _bin/${{ matrix.board }}
+        retention-days: ${{ github.event_name == 'release' && 90 || 1 }}
 
     - name: Upload Release Asset
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
       if: ${{ github.event_name == 'release' }}
       with:
         files: |

@@ -1,299 +1,242 @@
-# Adafruit nRF52 Bootloader
+# Meshtastic OTAFIX Bootloader
+
+[![Build](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/actions/workflows/githubci.yml/badge.svg)](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/actions/workflows/githubci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
+Adafruit nRF52 bootloader with enhanced OTA DFU, forked for [Meshtastic](https://meshtastic.org) from [oltaco's OTAFIX bootloader](https://github.com/oltaco/Adafruit_nRF52_Bootloader_OTAFIX). This is the bootloader several nRF52-based Meshtastic devices ship with, and the one the [Meshtastic Android app](https://github.com/meshtastic/Meshtastic-Android) can upgrade in-app.
+
+Current release: **OTAFIX 2.3** — see [changelog.md](changelog.md) for version history.
+
+## Contents
+
+- [How this fits together](#how-this-fits-together)
+- [Boards supported](#boards-supported)
+- [BLE advertising names](#ble-advertising-names)
+- [Installation](#installation)
+- [Bootloader upgrade from the Meshtastic Android app](#bootloader-upgrade-from-the-meshtastic-android-app)
+- [Troubleshooting](#troubleshooting)
+- [Recommended OTA DFU settings](#recommended-ota-dfu-settings)
+- [Notes on Xiao NRF52840 BLE](#notes-on-xiao-nrf52840-ble)
+- [Notes on RAK4631 bootloader](#notes-on-rak4631-bootloader)
+- [Contributing](#contributing)
+- [Getting help](#getting-help)
+- [License](#license)
+
+---
+
+## How this fits together
+
+This repo builds **only the bootloader** — the small program that runs
+before anything else on the device. It does not contain the Meshtastic
+application (the LoRa mesh, BLE, and display code); that's built entirely
+separately in [`meshtastic/firmware`](https://github.com/meshtastic/firmware).
+This bootloader's job is just to start that application, or, when asked,
+replace it (or itself) with a new version.
+
+On every power-up or reset, a tiny fixed piece of code at the very start of
+flash — Nordic's **MBR** — hands off to this bootloader. From there, the
+bootloader either:
+
+- boots straight into the installed Meshtastic application, or
+- if no valid application is installed, or the user has asked for it, waits
+  for a new one.
+
+A new application image — or occasionally the bootloader itself — can be
+installed three different ways:
+
+| Method | Transport | Typical use |
+|---|---|---|
+| **UF2 drag-and-drop** | USB, appears as a drive | Manual flashing — see [Installation](#installation) |
+| **Serial DFU** | USB, appears as a serial port | Recovery, and flashing a full bootloader+SoftDevice package with `adafruit-nrfutil` — see [Installation](#installation) |
+| **BLE OTA DFU** | Bluetooth, no cable needed | The Meshtastic Android app's firmware/bootloader update, and any Nordic DFU app — see [below](#bootloader-upgrade-from-the-meshtastic-android-app) and [recommended settings](#recommended-ota-dfu-settings) |
+
+BLE OTA DFU is the only *wireless* path, which is what the "OTA" in
+"OTAFIX" refers to — and it's also the bootloader's default fallback: since
+**OTAFIX 2.0**, if no valid application is present, the device waits in BLE
+OTA mode automatically rather than risk getting stuck (see
+[Troubleshooting](#troubleshooting)).
+
+The application also relies on Nordic's **SoftDevice** — a closed-source,
+precompiled Bluetooth stack (vendored here as a hex blob under
+`lib/softdevice/`) that sits in flash alongside it. The bootloader and the
+application both call into it for BLE, so bootloader and SoftDevice
+versions are usually flashed together as a matched pair (that's why the
+[Installation](#installation) instructions below mention flashing "a full
+bootloader and SoftDevice zip package").
 
-[![Build Status](https://github.com/adafruit/Adafruit_nRF52_Bootloader/workflows/Build/badge.svg)](https://github.com/adafruit/Adafruit_nRF52_Bootloader/actions)
+---
 
-A CDC/DFU/UF2 bootloader for Nordic nRF52 microcontroller. UF2 is an easy-to-use bootloader that appears as a flash drive. You can just copy `.uf2`-format application images to the flash drive to load new firmware. See https://github.com/Microsoft/uf2 for more information.
+## Boards supported
+- Elecrow ThinkNode M1
+- Elecrow ThinkNode M3
+- Elecrow ThinkNode M6
+- Heltec T096
+- Heltec T1
+- Heltec T114 / HT-nRF5262
+- LilyGO T-Echo
+- Minewsemi MX25LE01
+- Nologo ProMicro NRF52840 (aka SuperMini NRF52840)
+- RAK 3401
+- RAK 4631 ([See note](#notes-on-rak4631-bootloader))
+- RAK WisMesh Tag
+- Seeed Studio SenseCAP Card Tracker T1000-E
+- Seeed SenseCAP Solar Node P1
+- Seeed Studio Wio Tracker L1
+- Seeed Studio XIAO nRF52840 BLE ([See note](#notes-on-xiao-nrf52840-ble))
+- Seeed Studio XIAO nRF52840 BLE SENSE
 
-DFU via serial/CDC requires [adafruit-nrfutil](https://github.com/adafruit/Adafruit_nRF52_nrfutil), a modified version of [Nordic nrfutil](https://github.com/NordicSemiconductor/pc-nrfutil). Install `python3` if it is not installed already and run this command to install adafruit-nrfutil from PyPi:
+If there is another nRF52840-based Meshtastic board you would like to see supported, please [raise a GitHub issue](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/issues/new/choose) — or see [Adding a new board](./CONTRIBUTING.md#adding-a-new-board) in `CONTRIBUTING.md` if you want to submit it yourself.
 
-```
-$ pip3 install --user adafruit-nrfutil
-```
+## BLE advertising names
 
-## Supported Boards
+When in OTA DFU mode, devices advertise using a board-specific name rather than the generic `AdaDFU`.
 
-Officially supported boards are:
+| Board                        | OTA DFU advertising name |
+| ---------------------------- | ------------------------ |
+| Elecrow ThinkNode M1         | `TNM1_DFU`               |
+| Elecrow ThinkNode M3         | `TNM3_DFU`               |
+| Elecrow ThinkNode M6         | `TNM6_DFU`               |
+| Heltec T096                  | `T096_DFU`               |
+| Heltec T1                    | `T1_DFU`                 |
+| Heltec T114                  | `T114_DFU`               |
+| LILYGO T-Echo                | `LGTE_DFU`               |
+| Minewsemi MX25LE01           | `MX25_DFU`               |
+| ProMicro NRF52840            | `PROM_DFU`               |
+| RAK 4631                     | `4631_DFU`               |
+| RAK 3401                     | `3401_DFU`               |
+| RAK WisMesh Tag              | `RTAG_DFU`               |
+| Seeed SenseCAP Solar Node P1 | `SCAP_DFU`               |
+| Seeed T1000e                 | `T1KE_DFU`               |
+| Seeed WioTracker L1          | `WTL1_DFU`               |
+| XIAO NRF52 BLE / SENSE       | `XIAO_DFU`               |
 
-- [Adafruit CLUE](https://www.adafruit.com/product/4500)
-- [Adafruit Circuit Playground Bluefruit](https://www.adafruit.com/product/4333)
-- [Adafruit Feather nRF52832](https://www.adafruit.com/product/3406)
-- [Adafruit Feather nRF52840 Express](https://www.adafruit.com/product/4062)
-- [Adafruit Feather nRF52840 Sense](https://www.adafruit.com/product/4516)
-- [Adafruit ItsyBitsy nRF52840 Express](https://www.adafruit.com/product/4481)
-- [Adafruit LED Glasses Driver nRF52840](https://www.adafruit.com/product/5217)
-- Adafruit Metro nRF52840 Express
-- [Raytac MDBT50Q-RX Dongle](https://www.adafruit.com/product/5199)
+---
 
-In addition, there is also lots of other 3rd-party boards which are added by other makers, users and community. Check
-out the [complete list of all boards here](/supported_boards.md).
+## Installation
 
-## Features
+The recommended way to install the bootloader is using the UF2 file.  
+Download the UF2 file for your board (they can be found in the [releases](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/releases) with filenames beginning with `update-`), enter UF2 mode (usually by double pressing the reset button within 0.5s) and copy the UF2 file across.
 
-- DFU over Serial and OTA (application, Bootloader+SD)
-- Self-upgradable via Serial and OTA
-- DFU using UF2 (https://github.com/Microsoft/uf2) (application only)
-- Auto-enter DFU briefly on startup for DTR auto-reset trick (832 only)
-- Supports dual bank firmware updates (disabled by default)
-- Supports signed firmware updates (disabled by default)
+If an incorrect bootloader has been flashed to the device, a full bootloader and SoftDevice zip package will need to be flashed using ``adafruit-nrfutil``.
 
-Note: For OTA, `Packet Receipt Notification` (PRN) must be 8 or less, which can be configured in nRF DFU. Otherwise, the
-bootloader will run out of
-memory.
+---
 
-## How to use
+## Bootloader upgrade from the Meshtastic Android app
 
-There are two pins, `DFU` and `FRST` that bootloader will check upon reset/power:
+The [Meshtastic Android app](https://github.com/meshtastic/Meshtastic-Android) can flash this bootloader directly — no manual UF2 drag-and-drop needed.
 
-- `Double Reset` Reset twice within 500 ms will enter DFU with UF2 and CDC support (only works with nRF52840)
-- `DFU = LOW` and `FRST = HIGH`: Enter bootloader with UF2 and CDC support
-- `DFU = LOW` and `FRST = LOW`: Enter bootloader with OTA, to upgrade with a mobile application such as Nordic nrfConnect/Toolbox
-- <s>`DFU = HIGH` and `FRST = LOW`: Factory Reset mode: erase firmware application and its data</s>
-- `DFU = HIGH` and `FRST = HIGH`: Go to application code if it is present, otherwise enter DFU with UF2
-- The `GPREGRET` register can also be set to force the bootloader can enter any of above modes (plus a CDC-only mode for Arduino).
-`GPREGRET` is set by the application before performing a soft reset.
+With the radio connected over **USB/serial** (not Bluetooth), open the connected radio's configuration, go to **Advanced → Firmware Update**, and where an upgraded bootloader is published for your board you'll see an **Upgrade bootloader** option alongside **Erase and reinstall**. The app reads `INFO_UF2.TXT` from the device's update drive first to confirm the board and Bluetooth stack before writing anything, and will ask you to select the update drive twice — once for the bootloader image, once for the firmware. See the app's [Firmware Updates guide](https://github.com/meshtastic/Meshtastic-Android/blob/main/docs/en/user/firmware.md) for the full flow.
 
-```c
-#include "nrf_nvic.h"
-void reset_to_uf2(void) {
-  NRF_POWER->GPREGRET = 0x57; // 0xA8 OTA, 0x4e Serial
-  NVIC_SystemReset();         // or sd_nvic_SystemReset();
-}
-```
+---
 
-On the Nordic PCA10056 DK board, `DFU` is connected to **Button1**, and `FRST` is connected to **Button2**.
-So holding down **Button1** while clicking **RESET** will put the board into USB bootloader mode, with UF2 and CDC support.
-Holding down **Button2** while clicking **RESET** will put the board into OTA (over-the-air) bootloader mode.
+## Troubleshooting
 
-On the Nordic PCA10059 Dongle board, `DFU` is connected to the white button.
-`FRST` is connected to pin 1.10. Ground it to pull `FRST` low, as if you had pushed an `FRST`  button.
-There is an adjacent ground pad.
+### Device does not appear as a USB drive or serial port
 
-For other boards, please check the board definition for details.
+If the device does not show up on your computer after flashing the bootloader or performing an OTA update, it may be **waiting in OTA DFU mode**.
 
-### Making your own UF2
+In **OTAFIX 2.0** and above, OTA DFU is the default state when no valid application is present.  
+In this mode:
+- No UF2 drive is exposed
+- No serial port is available
+- The device is waiting for an OTA firmware update over BLE
 
-To create your own UF2 DFU update image, simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840** (nRF52840) or **0x621E937A** (nRF52833).
+**What to do:**
+- Perform an OTA update using a supported DFU app, **or**
+- Explicitly request UF2/serial mode using **double-reset**.
 
-```
-nRF52840
-uf2conv.py firmware.hex -c -f 0xADA52840
+This behaviour is intentional and prevents devices from getting stuck in UF2 mode after failed OTA updates.
 
-nRF52833
-uf2conv.py firmware.hex -c -f 0x621E937A
-```
+---
 
-If using a .bin file with the conversion script you must specify application address with the -b switch, this address depend on the SoftDevice size/version e.g S140 v6 is 0x26000, v7 is 0x27000
+### OTA update fails with `Error: Operation Failed`
 
-```
-nRF52840
-uf2conv.py firmware.bin -c -b 0x26000 -f 0xADA52840
+If an OTA update consistently fails early with `Error: Operation Failed`, this is often caused by BLE stack incompatibilities when **Request High MTU** is enabled.
 
-nRF52833
-uf2conv.py firmware.bin -c -b 0x27000 -f 0x621E937A
-```
+**What to try:**
+- Experiment with different PRN settings — try 12, 8, 1, or off altogether.
+- Disable **Request High MTU** in the DFU app.
 
-To create a UF2 image for bootloader from a .hex file using separated family of **0xd663823c**
+While high MTU significantly improves performance on supported devices, it is not required for a successful OTA update.
 
-```
-uf2conv.py bootloader.hex -c -f 0xd663823c
-```
+---
 
-## Burn & Upgrade with pre-built binaries
+## Recommended OTA DFU settings
 
-You can burn and/or upgrade the bootloader with either a J-link or DFU (serial) to a specific pre-built binary version
-without the hassle of installing a toolchain and compiling the code.
-This is preferred if you are not developing/customizing the bootloader.
-Pre-builtin binaries are available on GitHub [releases](https://github.com/adafruit/Adafruit_nRF52_Bootloader/releases)
+To perform the OTA update, use **nRF Device Firmware Update**  
+([Android](https://play.google.com/store/apps/details?id=no.nordicsemi.android.dfu&hl=en&gl=US) / [iOS](https://apps.apple.com/sa/app/device-firmware-update/id1624454660))  
+or **nRF Connect**  
+([Android](https://play.google.com/store/apps/details?id=no.nordicsemi.android.mcp&hl=en&gl=US) / [iOS](https://apps.apple.com/gb/app/nrf-connect-for-mobile/id1054362403)).
 
-Note: The bootloader can be downgraded. Since the binary release is a merged version of
-both bootloader and the Nordic SoftDevice, you can freely upgrade/downgrade to any version you like.
+**nRF Device Firmware Update** is the recommended app of the two.
 
-## How to compile and build 
+For **OTAFIX 2.0** and later, the following settings are recommended (these may change — feel free to experiment and report findings via a GitHub issue):
 
-You should only continue if you are looking to develop bootloader for your own.
-You must have have a J-Link available to "unbrick" your device.
+<table>
+<tr>
+<td valign="top">
 
-### Prerequisites
+**Packet Receipt Notification (PRN):** ON  
+**Number of packets:** 30  
+**Reboot time:** 0ms  
+**Scan timeout:** 2000ms  
+**Request high MTU:** ON for Android (see notes below) / not available on iOS  
+**Disable resume:** ON  
+**Prepare object delay:** 0ms  
+**Force scanning:** ON  
+**Keep bond:** OFF  
+**External MCU DFU:** OFF  
 
-- ARM GCC
-- Nordic's [nRF5x Command Line Tools](https://www.nordicsemi.com/Software-and-Tools/Development-Tools/nRF-Command-Line-Tools)
-- [Python IntelHex](https://pypi.org/project/IntelHex/)
+**Notes:**
+- Some Android devices and BLE stacks do not behave well with **Request high MTU** enabled.  
+  If the transfer fails early with `ERROR: Operation Failed`, retry with **Request high MTU turned OFF**.
+- For maximum speed, Packet Receipt Notification can be disabled, and the number of packets increased.  
+  Android is generally more tolerant of higher values; on iOS and other small-packet hosts, values above ~60 are not recommended.
 
-### Build:
+</td>
+</tr>
+</table>
 
-Firstly clone this repo including its submodules with following command:
+[Recommended settings for versions prior to 2.0 can be found here](docs/oldsettings.md).
 
-```
-git clone --recurse-submodules https://github.com/adafruit/Adafruit_nRF52_Bootloader
-```
+**IMPORTANT:**  
+On <u>older versions</u> of the bootloader, performing an OTA update while the device was connected to a computer USB host would complete successfully but **would not automatically boot into the new application firmware**, requiring a manual reset.  
+This issue is fixed in **OTAFIX 2.0**.
 
-For git versions before `2.13.0` you have to do that manually:
-```
-git clone https://github.com/adafruit/Adafruit_nRF52_Bootloader
-cd Adafruit_nRF52_Bootloader
-git submodule update --init
-```
+---
 
-#### Build using `make`
-Then build it with `make BOARD={board} all`, for example:
+## Notes on Xiao NRF52840 BLE
 
-```
-make BOARD=feather_nrf52840_express all
-```
+Many of these boards are shipped with the Sense version of the bootloader installed. If your board has the Sense version installed you must use the Sense version when updating via UF2.
 
-For the list of supported boards, run `make` without `BOARD=` :
+You can look at the INFO_UF2.TXT file on the UF2 drive to check what version is currently installed.
 
-```
-make
-You must provide a BOARD parameter with 'BOARD='
-Supported boards are: feather_nrf52840_express feather_nrf52840_express pca10056
-Makefile:90: *** BOARD not defined.  Stop
-```
+To check:
+1. Enter UF2 DFU mode (double-press reset) 
+2. Open the `INFO_UF2.TXT` file on the mounted drive  
 
-#### Build using `cmake`
+If the file shows: "Board-ID: nRF52840-SeeedXiaoSense-v1" then the ***SENSE*** variant must be used if updating via UF2 file.
 
-Firstly initialize your build environment by passing your board to `cmake` via `-DBOARD={board}`:
+## Notes on RAK4631 bootloader
 
-```bash
-mkdir build
-cd build
-cmake .. -DBOARD=feather_nrf52840_express 
-```
+This version of the RAK4631 bootloader is based on a much newer version (0.9.2) of the Adafruit nRF52 bootloader than what RAK Wireless uses on their official bootloader (0.6.2-11). It has been tested with no problems found; whether RAK's own patches to the Adafruit bootloader introduce any behavioral difference has not been investigated. A variant of the official RAK bootloader with these patches included instead is available [here](https://github.com/oltaco/WisCore_RAK4631_Bootloader/releases).
 
-And then build it with:
+---
 
-```bash
-make
-```
+## Contributing
 
-You can also use the generator of your choice. For example adding the `-GNinja` and then you can invoke `ninja build` instead of `make`.
+Want to build from source, add a board, or submit a fix? See
+[`CONTRIBUTING.md`](./CONTRIBUTING.md) for the development setup and PR
+process, and [`AGENTS.md`](./AGENTS.md) for how the codebase is put
+together.
 
-To list all supported targets, run:
+## Getting help
 
-```bash
-cmake --build . --target help
-``` 
+- **Questions or troubleshooting:** [Meshtastic Discussions](https://github.com/orgs/meshtastic/discussions)
+- **Bug reports and feature requests:** [open an issue](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/issues/new/choose)
+- **Security vulnerabilities:** see [`SECURITY.md`](./SECURITY.md) — please do not open a public issue
+- **General Meshtastic docs:** [meshtastic.org](https://meshtastic.org/)
 
-To build individual targets, you can specify it directly with `make` or using `cmake --build`:
+## License
 
-```bash
-make bootloader
-cmake --build . --target bootloader
-```
-
-### Flash
-
-To flash the bootloader (without softdevice/mbr) using JLink:
-
-```
-make BOARD=feather_nrf52840_express flash
-```
-
-If you are using pyocd as debugger, add `FLASHER=pyocd` to make command:
-
-```
-make BOARD=feather_nrf52840_express FLASHER=pyocd flash
-```
-
-To upgrade the bootloader using DFU Serial via port /dev/ttyACM0
-
-```
-make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 flash-dfu
-```
-
-To flash SoftDevice (will also erase chip):
-
-```
-make BOARD=feather_nrf52840_express flash-sd
-```
-
-To flash MBR only
-
-```
-make BOARD=feather_nrf52840_express flash-mbr
-```
-
-### Dual bank firmware support:
-
-This bootloader can split the FLASH memory into 2 partitions, one for the last successfully uploaded firmware, and the other for the new firmware that is being uploaded. In case the firmware upload fails, the bootloader will revert to the last working firmware version. The only drawback is that the maximum firmware size is half of the device FLASH size: That is why it is disabled by default.
-You can enable this feature by passing DUALBANK_FW=1 to the make process while compiling the bootloader
-
-### Signed firmware support:
-This bootloader can validate that the uploaded firmware is digitally signed, and refuse to install unsigned or signed with the improper key firmware. Because this will make Arduino uploads stop working (because they are not digitally signed), this feature is disabled by default.
-But if you want to ensure noone else is allowed to upload firmware to your device, this option is probably what you want to enable.
-
-To create a signing key, you will need the adafruit-nrfutil utility. First, generate a signing key and store at given path by using
-
-```
-adafruit-nrfutil keys --gen-key stored_key.pem
-```
-
-This command will create a signing key and store it in the file stored_key.pem.  STORE THIS FILE IN A SAFE PLACE, as without it, you won't be able to sign your firmware packages, and the bootloader will refuse to flash them!!
-
-Now, you must show the verification key (that is calculated from the signing key):
-
-```
-adafruit-nrfutil keys --show-vk code stored_key.pem
-```
-
-This command will read your signing key (from the file stored_key.pem) and display C source code with the Qx and Qy arrays: Something along the lines
-
-```
-static uint8_t Qx[] = { ... };
-static uint8_t Qy[] = { ... };
-```
-
-You must save the Qx and Qy values, remove all spaces, and pass them to the make command line
-```
-make BOARD=feather_nrf52840_express SIGNED_FW=1 SIGNED_FW_QX='Qx values' SIGNED_FW_QY='Qy values'
-```
-
-And replace Qx values with the Qx array values, and the Qy values with the Qy array values. That will create a bootloader that ONLY accepts firmware signed with the stored_key.pem signing key. Take into account that the option SIGNED_FW=1 is what enables to build a bootloader that enforces signing, and will ALSO result in disabling UF2 support, as UF2 format does NOT support signing keys. There is an option (only for testing!) called FORCE_UF2 that will FORCE UF2 support on bootloaders that enforce firmware security. It is there to bypass security so you can test a secure bootloader and have a way to recover it something goes wrong, but should NEVER be used if you want to enforce security
-
-Finally, to create a signed firmware application/bootloader update package, you can use, for example
-
-```
-adafruit-nrfutil dfu genpkg --dev-type 0x0052 --sd-req 0x0123 --application "application.hex" --key-file "stored_key.pem" "application_package.zip"
-```
-
-Please, use full paths for all files. The examples omit them for clarity!
-
-And, to upload it to your device, 
-
-```
-adafruit-nrfutil.exe --verbose dfu serial -pkg "application_package.zip" -p /dev/tty0 -b 115200
-```
-
-### Common makefile problems
-
-#### `arm-none-eabi-gcc`: No such file or directory
-
-If you get the following error ...
-
-```
-make BOARD=feather_nrf52840_express all
-Compiling file: main.c
-/bin/sh: /usr/bin/arm-none-eabi-gcc: No such file or directory
-make: *** [_build/main.o] Error 127
-```
-
-... you may need to pass the location of the GCC ARM toolchain binaries to `make` using
-the variable `CROSS_COMPILE` as below:
-```
-make CROSS_COMPILE=/opt/gcc-arm-none-eabi-9-2019-q4-major/bin/arm-none-eabi- BOARD=feather_nrf52832 all
-```
-
-For other compile errors, check the gcc version with `arm-none-eabi-gcc --version` to insure it is at least 9.x.
-
-#### `ModuleNotFoundError: No module named 'intelhex'`
-
-Install python-intelhex with
-
-```
-pip install intelhex
-```
-
-#### `make: nrfjprog: No such file or directory`
-
-Make sure that `nrfjprog` is available from the command-line. This binary is
-part of Nordic's nRF5x Command Line Tools.
+[MIT](./LICENSE), originally Copyright (c) 2016 Adafruit Industries.

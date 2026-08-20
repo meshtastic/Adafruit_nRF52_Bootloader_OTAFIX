@@ -1,5 +1,49 @@
 # Adafruit nRF52 Bootloader Changelog
 
+OTAFIX 2.1–2.3 are Meshtastic's fork; everything from 0.6.2 down predates
+it and is upstream Adafruit history, kept for provenance.
+
+## OTAFIX 2.3
+
+- New boards: Heltec T096, Heltec T1, RAK 3401 (merged from oltaco's upstream, which calls this same board-support work "OTAFIX 2.3" too).
+- `screen.c` refactored to a display-size-agnostic layout (macro-based bar/text positions instead of hardcoded pixel offsets) — no behavior change for existing boards, needed for the new boards' smaller displays.
+- ST7735 display controller support, alongside the existing ST7789 path.
+- Backported five upstream Adafruit fixes, hardware-validated on a RAK4631:
+  - Boot loop from a wrong REGOUT0 read.
+  - GCC 15 build errors (Makefile version filter, `ghostfat.c`).
+  - `-Werror=array-bounds` false positive in `bootloader_settings.c`, replaced with a scoped pragma instead of the previous repo-wide `--param=min-pagesize=0` workaround.
+  - Clear CONTROL/PRIMASK/BASEPRI/FAULTMASK before jumping to the application — was rarely causing lockups.
+  - Wait for BLE notification-queue room instead of silently dropping DFU completion notifications.
+- Fixed a latent out-of-bounds write in `screen.c`'s `print()`: it drew a glyph before checking whether it fit on screen, rather than after. Not reachable on any current board, but a real hazard for future `board.h` layouts.
+- `AGENTS.md` gotcha: flashing the bootloader+SoftDevice package over serial DFU zeros `bank_0`, so the device intentionally comes up in BLE-OTA wait mode instead of the app on the next boot — not a brick.
+
+## OTAFIX 2.2
+
+- Use maximum TX power for BLE: BLE TX power set to +8 for nRF52840.
+- New boards: Elecrow ThinkNode M1, M3, M6; LilyGo T-Echo; Minewsemi MX25LE01; Seeed SenseCAP Solar Node P1.
+
+## OTAFIX 2.1
+
+- Defaults to OTA DFU mode when no valid application is present, preventing devices from becoming stuck in UF2 mode after a failed OTA update.
+- High-MTU BLE support for larger DFU packets. The Android DFU app and [`dfu.py`](https://github.com/recrof/nrf_dfu_py) support large packets; the iOS DFU app is limited to 20-byte packets.
+- Lazy flash erase: pages are erased on demand during the transfer instead of upfront, reducing the delay before the transfer begins.
+- Small-packet accumulation: packets smaller than 64 bytes are combined at the transport layer and written to flash in chunks of up to 240 bytes, improving OTA performance from iOS and other small-packet DFU hosts.
+- Automatic application boot after OTA over USB, instead of requiring a manual reset.
+- Unique BLE advertising names per board in OTA DFU mode, instead of the generic `AdaDFU`:
+  - Elecrow ThinkNode M1 → `TNM1_DFU`
+  - Elecrow ThinkNode M3 → `TNM3_DFU`
+  - Elecrow ThinkNode M6 → `TNM6_DFU`
+  - Heltec T114 → `T114_DFU`
+  - LILYGO T-Echo → `LGTE_DFU`
+  - Minewsemi MX25LE01 → `MX25_DFU`
+  - ProMicro NRF52840 → `PROM_DFU`
+  - RAK 4631 → `4631_DFU`
+  - RAK WisMesh Tag → `RTAG_DFU`
+  - Seeed SenseCAP Solar Node P1 → `SCAP_DFU`
+  - Seeed T1000e → `T1KE_DFU`
+  - Seeed WioTracker L1 → `WTL1_DFU`
+  - XIAO NRF52 BLE / SENSE → `XIAO_DFU`
+
 ## 0.6.2 - 2021.09.10
 
 - Add new board "LED Glasses Driver nRF52840"
