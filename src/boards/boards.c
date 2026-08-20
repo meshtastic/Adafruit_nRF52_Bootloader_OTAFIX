@@ -791,3 +791,147 @@ static void tft_controller_init(void) {
 }
 
 #endif
+
+#ifdef DISPLAY_CONTROLLER_ST7735
+
+#define ST_CMD_DELAY 0x80 // special signifier for command lists
+
+// ST77XX common commands (shared with ST7789)
+#define ST77XX_NOP 0x00
+#define ST77XX_SWRESET 0x01
+#define ST77XX_RDDID 0x04
+#define ST77XX_RDDST 0x09
+
+#define ST77XX_SLPIN 0x10
+#define ST77XX_SLPOUT 0x11
+#define ST77XX_PTLON 0x12
+#define ST77XX_NORON 0x13
+
+#define ST77XX_INVOFF 0x20
+#define ST77XX_INVON 0x21
+#define ST77XX_DISPOFF 0x28
+#define ST77XX_DISPON 0x29
+#define ST77XX_CASET 0x2A
+#define ST77XX_RASET 0x2B
+#define ST77XX_RAMWR 0x2C
+#define ST77XX_RAMRD 0x2E
+
+#define ST77XX_PTLAR 0x30
+#define ST77XX_TEOFF 0x34
+#define ST77XX_TEON 0x35
+#define ST77XX_MADCTL 0x36
+#define ST77XX_VSCSAD 0x37
+#define ST77XX_COLMOD 0x3A
+
+#define ST77XX_MADCTL_MY 0x80
+#define ST77XX_MADCTL_MX 0x40
+#define ST77XX_MADCTL_MV 0x20
+#define ST77XX_MADCTL_ML 0x10
+#define ST77XX_MADCTL_RGB 0x00
+
+#define ST77XX_RDID1 0xDA
+#define ST77XX_RDID2 0xDB
+#define ST77XX_RDID3 0xDC
+#define ST77XX_RDID4 0xDD
+
+// ST7735-specific commands
+#define ST7735_FRMCTR1 0xB1
+#define ST7735_FRMCTR2 0xB2
+#define ST7735_FRMCTR3 0xB3
+#define ST7735_INVCTR 0xB4
+#define ST7735_PWCTR1 0xC0
+#define ST7735_PWCTR2 0xC1
+#define ST7735_PWCTR3 0xC2
+#define ST7735_PWCTR4 0xC3
+#define ST7735_PWCTR5 0xC4
+#define ST7735_VMCTR1 0xC5
+#define ST7735_GMCTRP1 0xE0
+#define ST7735_GMCTRN1 0xE1
+#define ST7735_MADCTL_BGR 0x08
+
+// Some ready-made 16-bit ('565') color settings:
+#define ST77XX_BLACK 0x0000
+#define ST77XX_WHITE 0xFFFF
+#define ST77XX_RED 0xF800
+#define ST77XX_GREEN 0x07E0
+#define ST77XX_BLUE 0x001F
+#define ST77XX_CYAN 0x07FF
+#define ST77XX_MAGENTA 0xF81F
+#define ST77XX_YELLOW 0xFFE0
+#define ST77XX_ORANGE 0xFC00
+
+static void tft_controller_init(void) {
+  // Init commands for ST7735 mini 160x80 screens
+  // Based on Adafruit INITR_MINI160x80 sequence
+  uint8_t cmdinit_st7735[] = {
+      #if !defined(DISPLAY_PIN_RST) || (DISPLAY_PIN_RST < 0)
+      // Software reset if rst pin not available
+      ST77XX_SWRESET, ST_CMD_DELAY, 150,
+      #endif
+      // Out of sleep mode, w/delay 255 = 500ms
+      ST77XX_SLPOUT, ST_CMD_DELAY, 255,
+      // Frame rate control - normal mode (3 args)
+      ST7735_FRMCTR1, 3, 0x01, 0x2C, 0x2D,
+      // Frame rate control - idle mode (3 args)
+      ST7735_FRMCTR2, 3, 0x01, 0x2C, 0x2D,
+      // Frame rate control - partial mode (6 args)
+      ST7735_FRMCTR3, 6, 0x01, 0x2C, 0x2D, 0x01, 0x2C, 0x2D,
+      // Display inversion control (1 arg)
+      ST7735_INVCTR, 1, 0x07,
+      // Power control 1 (3 args)
+      ST7735_PWCTR1, 3, 0xA2, 0x02, 0x84,
+      // Power control 2 (1 arg)
+      ST7735_PWCTR2, 1, 0xC5,
+      // Power control 3 - normal mode (2 args)
+      ST7735_PWCTR3, 2, 0x0A, 0x00,
+      // Power control 4 - idle mode (2 args)
+      ST7735_PWCTR4, 2, 0x8A, 0x2A,
+      // Power control 5 - partial mode (2 args)
+      ST7735_PWCTR5, 2, 0x8A, 0xEE,
+      // VCOM control (1 arg)
+      ST7735_VMCTR1, 1, 0x0E,
+      // Inversion off (required for Heltec T096)
+      ST77XX_INVOFF, 0,
+      // Set color mode, 1 arg: 16-bit color (0x05 for ST7735)
+      ST77XX_COLMOD, 1 + ST_CMD_DELAY, 0x05, 10,
+      // Mem access ctrl, 1 arg: row/col addr, color order
+      ST77XX_MADCTL, 1, DISPLAY_MADCTL,
+      // Column addr set, 4 args: XSTART/XEND (132 wide framebuffer)
+      ST77XX_CASET, 4, 0x00, 0x00, 0x00, 0x83,
+      // Row addr set, 4 args: YSTART/YEND (162 tall framebuffer)
+      ST77XX_RASET, 4, 0x00, 0x00, 0x00, 0xA1,
+      // Positive gamma correction (16 args)
+      ST7735_GMCTRP1, 16,
+          0x02, 0x1C, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2D,
+          0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10,
+      // Negative gamma correction (16 args)
+      ST7735_GMCTRN1, 16,
+          0x03, 0x1D, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
+          0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10,
+      // Normal display on, w/delay 10ms
+      ST77XX_NORON, ST_CMD_DELAY, 10,
+      // Main screen turn on, w/delay 100ms
+      ST77XX_DISPON, ST_CMD_DELAY, 100
+  };
+
+  size_t count = 0;
+  while (count < sizeof(cmdinit_st7735)) {
+    uint8_t const cmd = cmdinit_st7735[count++];
+    uint8_t const cmd_arg = cmdinit_st7735[count++];
+    uint8_t const has_delay = cmd_arg & ST_CMD_DELAY;
+    uint8_t const narg = cmd_arg & ~ST_CMD_DELAY;
+
+    tft_cmd(cmd, cmdinit_st7735 + count, narg);
+    count += narg;
+
+    if (has_delay) {
+      uint16_t delay = (uint16_t) cmdinit_st7735[count++];
+      if (delay == 255) {
+        delay = 500; // If 255, delay for 500 ms
+      }
+      NRFX_DELAY_MS(delay);
+    }
+  }
+}
+
+#endif

@@ -58,6 +58,7 @@ else
   LD_FILE = linker/$(MCU_SUB_VARIANT).ld
 endif
 
+GIT_SUBMODULE_VERSIONS := $(shell git submodule status | cut -d" " -f3,4 | paste -s -d" " -)
 GIT_VERSION := $(shell git describe --dirty --always --tags)
 
 # compiled file name
@@ -359,7 +360,8 @@ ifneq ($(USE_NFCT),yes)
 endif
 
 CFLAGS += -DSOFTDEVICE_PRESENT
-CFLAGS += -DUF2_VERSION='"$(GIT_VERSION)"'
+CFLAGS += -DUF2_VERSION_BASE='"$(GIT_VERSION)"'
+CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS)"'
 CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
 
 ifeq ($(SIGNED_FW), 1)
