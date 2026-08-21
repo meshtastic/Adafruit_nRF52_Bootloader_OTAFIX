@@ -32,6 +32,13 @@
  */
 uint32_t bootloader_init(void);
 
+/**@brief Function to check if bootloader must be reentered after a reset
+ * @details: This function can only be called after bootloader_dfu_start returns
+ * @retval     true          If device must reboot to the bootloader
+ * @retval     false         If device must reboot to the application, if possible
+ */
+bool bootloader_must_reset_to_self(void);
+
 /**@brief Function for validating application region in flash.
  * @retval     true          If Application region is valid.
  * @retval     false         If Application region is not valid.
@@ -67,6 +74,20 @@ void bootloader_settings_get(bootloader_settings_t * const p_settings);
  */
 void bootloader_dfu_update_process(dfu_update_status_t update_status);
 
+/**@brief Mark that startup DFU has received valid update activity.
+ *
+ * @details This suppresses the startup timeout or USB unplug fallback that is only
+ *          meant for the "entered bootloader, but never started an update" case.
+ */
+void bootloader_dfu_activity_mark(void);
+
+/**@brief Mark that the USB DFU session was enumerated by a host.
+ *
+ * @details Called from tud_mount_cb(). Enables the USB-unplug exit path in
+ *          wait_for_events(), which exits startup DFU once VBUS is removed.
+ */
+void bootloader_mark_usb_mounted(void);
+
 /**@brief Function getting state of SoftDevice update in progress.
  *        After a successfull SoftDevice transfer the system restarts in orderto disable SoftDevice
  *        and complete the update.
@@ -91,6 +112,8 @@ uint32_t bootloader_dfu_sd_update_finalize(void);
 
 
 void bootloader_mbr_addrs_populate(void);
+
+extern uint32_t proc_soc(void);
 
 #endif // BOOTLOADER_H__
 

@@ -25,22 +25,19 @@
 #ifndef _MINEWSEMI_MX25LE01_H
 #define _MINEWSEMI_MX25LE01_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER           2
-#define LED_PRIMARY_PIN       _PINNUM(1, 7)
-#define LED_SECONDARY_PIN     _PINNUM(1, 5)
+#define LED_PRIMARY_PIN       PINNUM(1, 7)
+#define LED_SECONDARY_PIN     PINNUM(1, 5)
 #define LED_STATE_ON          1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(0, 27)
-#define BUTTON_2              _PINNUM(0, 11)
+#define BUTTON_DFU              PINNUM(0, 27)
+#define BUTTON_DFU_OTA              PINNUM(0, 11)
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+

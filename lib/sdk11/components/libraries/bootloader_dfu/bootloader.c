@@ -44,15 +44,38 @@ typedef enum
     BOOTLOADER_SETTINGS_SAVING,                         /**< Bootloader status for indicating that saving of bootloader settings is in progress. */
     BOOTLOADER_COMPLETE,                                /**< Bootloader status for indicating that all operations for the update procedure has completed and it is safe to reset the system. */
     BOOTLOADER_TIMEOUT,                                 /**< Bootloader status field for indicating that a timeout has occured and current update process should be aborted. */
-    BOOTLOADER_RESET,                                   /**< Bootloader status field for indicating that a reset has been requested and current update process should be aborted. */
+    BOOTLOADER_SYS_RESET,                               /**< Bootloader status field for indicating that a reset has been requested and current update process should be aborted. */
+    BOOTLOADER_RESET_TO_SELF,                           /**< Bootloader status field for indicating that a reset has been requested and current update process should be aborted and the bootloader must be reentered. */
 } bootloader_status_t;
 
 static pstorage_handle_t        m_bootsettings_handle;  /**< Pstorage handle to use for registration and identifying the bootloader module on subsequent calls to the pstorage module for load and store of bootloader setting in flash. */
 static bootloader_status_t      m_update_status;        /**< Current update status for the bootloader module to ensure correct behaviour when updating settings and when update completes. */
 static bool m_cancel_timeout_on_usb; /**< If set the timeout is cancelled when USB is enumerated. Otherwise, the timeout is only cancelled when DFU update is started. */
+static bool m_usb_was_mounted; /**< Tracks whether the USB DFU session was ever enumerated so we can exit when cable is later removed. */
+static bool m_startup_dfu_has_activity; /**< Tracks whether any valid serial or UF2 update traffic has started. */
 
 APP_TIMER_DEF( _dfu_startup_timer );
-volatile bool dfu_startup_packet_received = false;
+
+static void bootloader_timeout_startup_dfu(void)
+{
+    if (!m_startup_dfu_has_activity)
+    {
+        dfu_update_status_t update_status;
+        update_status.status_code = DFU_TIMEOUT;
+
+        bootloader_dfu_update_process(update_status);
+    }
+}
+
+void bootloader_dfu_activity_mark(void)
+{
+    m_startup_dfu_has_activity = true;
+}
+
+void bootloader_mark_usb_mounted(void)
+{
+    m_usb_was_mounted = true;
+}
 
 /**@brief   Function for handling callbacks from pstorage module.
  *
@@ -81,22 +104,17 @@ static void pstorage_callback_handler(pstorage_handle_t * p_handle,
 static void dfu_startup_timer_handler(void * p_context)
 {
 #ifdef NRF_USBD
-  if (m_cancel_timeout_on_usb && tud_mounted())
+  // If host enumerated the device, keep waiting — m_usb_was_mounted was set
+  // by tud_mount_cb() and the unplug path in wait_for_events() will handle exit.
+  if (m_cancel_timeout_on_usb && m_usb_was_mounted)
   {
     return;
   }
 #endif
 
   // nRF52832 forced DFU on startup
-  // No packets are received within timeout, exit DFU mode
-  // dfu_startup_packet_received is set by process_dfu_packet() in dfu_transport_serial.c
-  if (!dfu_startup_packet_received)
-  {
-    dfu_update_status_t update_status;
-    update_status.status_code = DFU_TIMEOUT;
-
-    bootloader_dfu_update_process(update_status);
-  }
+  // No update activity is received within timeout, exit DFU mode
+  bootloader_timeout_startup_dfu();
 }
 
 /**@brief   Function for waiting for events.
@@ -117,7 +135,7 @@ static void wait_for_events(void)
 
     // Feed all Watchdog just in case application enable it
     // WDT cannot be disabled once started. It even last through NVIC soft reset
-    if ( nrf_wdt_started_check(NRF_WDT) )
+    if ( nrf_wdt_started(NRF_WDT) )
     {
       for (uint8_t i=0; i<8; i++) nrf_wdt_reload_request_set(NRF_WDT, i);
     }
@@ -132,13 +150,22 @@ static void wait_for_events(void)
       tud_task();
       tud_cdc_write_flush();
     }
+
+    // Exit startup DFU once USB was actually unplugged (VBUS gone), not on a
+    // host-side re-enumeration or temporary unmount.
+    if (m_cancel_timeout_on_usb && m_usb_was_mounted &&
+        !(NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk))
+    {
+      bootloader_timeout_startup_dfu();
+    }
 #endif
 
     if ((m_update_status == BOOTLOADER_COMPLETE) ||
         (m_update_status == BOOTLOADER_TIMEOUT) ||
-        (m_update_status == BOOTLOADER_RESET) )
+        (m_update_status == BOOTLOADER_SYS_RESET) ||
+        (m_update_status == BOOTLOADER_RESET_TO_SELF))
     {
-      // When update has completed or a timeout/reset occured we will return.
+      // When update has completed or a timeout/reset occurred we will return.
       return;
     }
   }
@@ -147,23 +174,22 @@ static void wait_for_events(void)
 
 bool bootloader_app_is_valid(void)
 {
-  bool success = false;
   uint32_t const app_addr = DFU_BANK_0_REGION_START;
-
-  bootloader_settings_t const *p_bootloader_settings;
-  bootloader_util_settings_get(&p_bootloader_settings);
+  uint32_t const sp_addr = *((uint32_t*)app_addr);
+  uint32_t const reset_addr = *((uint32_t*)(app_addr + 4));
 
   enum { EMPTY_FLASH = 0xFFFFFFFFUL };
 
-  // Application is invalid if first 2 words are all 0xFFFFFFF
-  if ( *((uint32_t *)app_addr    ) == EMPTY_FLASH &&
-       *((uint32_t *)(app_addr+4)) == EMPTY_FLASH )
+  if (sp_addr == EMPTY_FLASH && reset_addr == EMPTY_FLASH)
   {
     return false;
   }
 
-  // The application in CODE region 1 is flagged as valid during update.
-  if ( p_bootloader_settings->bank_0 == BANK_VALID_APP )
+  bootloader_settings_t const * p_bootloader_settings;
+  bootloader_util_settings_get(&p_bootloader_settings);
+
+  // Primary path: a prior DFU flagged bank 0 as valid.
+  if (p_bootloader_settings->bank_0 == BANK_VALID_APP)
   {
     uint16_t image_crc = 0;
 
@@ -175,10 +201,26 @@ bool bootloader_app_is_valid(void)
                                 NULL);
     }
 
-    success = (image_crc == p_bootloader_settings->bank_0_crc);
+    return (image_crc == p_bootloader_settings->bank_0_crc);
   }
 
-  return success;
+  // Fallback for debugger-flashed apps: settings page is erased (bank_0 = 0xFFFF)
+  // but an app may still have been written to bank 0 directly. Accept it if its
+  // Cortex-M vector table is plausible: initial SP within RAM, reset vector
+  // within app flash region with the Thumb bit set. The SP upper bound is
+  // inclusive because the empty-descending stack initializes one past RAM end.
+  if (p_bootloader_settings->bank_0 == 0xFFFF)
+  {
+    uint32_t const ram_start = 0x20000000UL;
+    uint32_t const ram_end = ram_start + (NRF_FICR->INFO.RAM << 10u);
+    bool const sp_valid = (sp_addr >= ram_start) && (sp_addr <= ram_end) && ((sp_addr & 3U) == 0);
+    bool const reset_in_app = (reset_addr & 1U) &&
+      (reset_addr >= app_addr) &&
+      (reset_addr < BOOTLOADER_REGION_START);
+    return sp_valid && reset_in_app;
+  }
+
+  return false;
 }
 
 
@@ -186,10 +228,36 @@ static void bootloader_settings_save(bootloader_settings_t * p_settings)
 {
   if ( is_ota() )
   {
-    uint32_t err_code = pstorage_clear(&m_bootsettings_handle, sizeof(bootloader_settings_t));
+    uint32_t err_code;
+    while(1) {
+      err_code = pstorage_clear(&m_bootsettings_handle, sizeof(bootloader_settings_t));
+      if (err_code != NRF_ERROR_NO_MEM) {
+        break;
+      }
+      // This means the write/erase queue of commands was completely full - Should not
+      //  happen, but better safe than sorry, wait until space becomes available -
+      //  the pstorage event handler is only run from the main loop, and we are also 
+      //  running from a BLE event on the main loop: This means if we wait here, the FLASH 
+      //  completion events will never be handled (will be queued by app_scheduler, but
+      //  not handled, and that means this wait will never end... So, process SOC events
+      //  from the SD (but NOT BLE events!) - This will free entries on the pstorage queue
+      //  as soon as operations are complete, allowing this op to be queued
+      while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+        // nothing
+      }
+    }
     APP_ERROR_CHECK(err_code);
 
-    err_code = pstorage_store(&m_bootsettings_handle, (uint8_t *) p_settings, sizeof(bootloader_settings_t), 0);
+    while(1) {
+      err_code = pstorage_store(&m_bootsettings_handle, (uint8_t *) p_settings, sizeof(bootloader_settings_t), 0);
+      if (err_code != NRF_ERROR_NO_MEM) {
+        break;
+      }
+      // No space, wait until an entry in the queue is freed
+      while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+        // nothing
+      }
+    }
     APP_ERROR_CHECK(err_code);
   }
   else
@@ -296,7 +364,8 @@ void bootloader_dfu_update_process(dfu_update_status_t update_status)
   }
   else if (update_status.status_code == DFU_RESET)
   {
-    m_update_status = BOOTLOADER_RESET;
+    m_update_status =
+      (update_status.restart_into_bootloader == false ? BOOTLOADER_SYS_RESET : BOOTLOADER_RESET_TO_SELF);
   }
   else
   {
@@ -304,6 +373,10 @@ void bootloader_dfu_update_process(dfu_update_status_t update_status)
   }
 }
 
+bool bootloader_must_reset_to_self(void)
+{
+  return m_update_status == BOOTLOADER_RESET_TO_SELF;
+}
 
 uint32_t bootloader_init(void)
 {
@@ -325,6 +398,8 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout
   uint32_t err_code;
 
   m_cancel_timeout_on_usb = cancel_timeout_on_usb && !ota;
+  m_usb_was_mounted = false;
+  m_startup_dfu_has_activity = false;
 
   // Clear swap if banked update is used.
   err_code = dfu_init();
@@ -340,8 +415,6 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout
     // - Makecode single tap reset but no enumerated (battery power)
     if ( timeout_ms )
     {
-      dfu_startup_packet_received = false;
-
       app_timer_create(&_dfu_startup_timer, APP_TIMER_MODE_SINGLE_SHOT, dfu_startup_timer_handler);
       app_timer_start(_dfu_startup_timer, APP_TIMER_TICKS(timeout_ms), NULL);
     }

@@ -20,10 +20,42 @@
  * @brief Device Firmware Update module type and definitions.
  */
 
+/*
+ * Flash layout (nrf52840, see linker/nrf52840.ld):
+ *
+ *  -------------------------
+ * |  Bootloader Settings    |
+ * |          4 KB           |
+ * |-------------------------| 0xFF000 BOOTLOADER_SETTINGS_ADDRESS
+ * |     MBR Params Page     |
+ * |          4 KB           |
+ * |-------------------------| 0xFE000
+ * |    Bootloader Config    |
+ * |          2 KB           |
+ * |-------------------------| 0xFD800
+ * |       Bootloader        |
+ * |          38 KB          |
+ * |-------------------------| 0xF4000 BOOTLOADER_REGION_START
+ * |    App Data Reserved    |
+ * |         40 KB           |
+ * |-------------------------| 0xEA000
+ * |       Application       |
+ * |    Single/ Dual Bank    |
+ * |                         |
+ * |-------------------------| CODE_REGION_1_START
+ * |        SoftDevice       |
+ * |    0x26000 (optional)   |
+ * |-------------------------| 0x01000
+ * |           MBR           |
+ * |          4 KB           |
+ *  -------------------------  0x00000
+ */
+
 #ifndef DFU_TYPES_H__
 #define DFU_TYPES_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "nrf_sdm.h"
 #include "nrf_mbr.h"
 #include "nrf.h"
@@ -74,8 +106,12 @@ static inline bool is_sd_existed(void)
 #endif
 
 #define DFU_IMAGE_MAX_SIZE_FULL         (DFU_REGION_TOTAL_SIZE - DFU_APP_DATA_RESERVED)                 /**< Maximum size of an application, excluding save data from the application. */
+#define DFU_IMAGE_MAX_SIZE_BANKED       (((DFU_IMAGE_MAX_SIZE_FULL) - \
+                                        (DFU_IMAGE_MAX_SIZE_FULL % (2 * CODE_PAGE_SIZE)))/2)            /**< Maximum size of an application, excluding save data from the application. */
+
 #define DFU_BL_IMAGE_MAX_SIZE           (BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS - BOOTLOADER_REGION_START)  /**< Maximum size of a bootloader, excluding save data from the current bootloader. */
 #define DFU_BANK_0_REGION_START         CODE_REGION_1_START                                             /**< Bank 0 region start. */
+#define DFU_BANK_1_REGION_START         (DFU_BANK_0_REGION_START + DFU_IMAGE_MAX_SIZE_BANKED)           /**< Bank 1 region start. */
 
 #define EMPTY_FLASH_MASK                0xFFFFFFFF                                                      /**< Bit mask that defines an empty address in flash. */
 
@@ -150,6 +186,7 @@ typedef struct
     uint32_t                 bl_size;                                                                   /**< Size of the recieved BootLoader. */
     uint32_t                 app_size;                                                                  /**< Size of the recieved Application. */
     uint32_t                 sd_image_start;                                                            /**< Location in flash where the received SoftDevice image is stored. */
+    bool                     restart_into_bootloader;                                                   /**< If the chip must be reset and must reenter bootloader mode. */
 } dfu_update_status_t;
 
 /**@brief Update complete handler type. */

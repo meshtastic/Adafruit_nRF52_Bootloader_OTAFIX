@@ -17,13 +17,13 @@
 #include <stddef.h>
 #include "sdk_common.h"
 
-#define MAX_DFU_PKT_LEN         (247 - 3) // MTU - 3 bytes for ATT header       /**< Maximum length (in bytes) of the DFU Packet characteristic. */
-#define PKT_START_DFU_PARAM_LEN 2                                               /**< Length (in bytes) of the parameters for Packet Start DFU Request. */
-#define PKT_INIT_DFU_PARAM_LEN  2                                               /**< Length (in bytes) of the parameters for Packet Init DFU Request. */
-#define PKT_RCPT_NOTIF_REQ_LEN  3                                               /**< Length (in bytes) of the Packet Receipt Notification Request. */
-#define MAX_PKTS_RCPT_NOTIF_LEN 6                                               /**< Maximum length (in bytes) of the Packets Receipt Notification. */
-#define MAX_RESPONSE_LEN        7                                               /**< Maximum length (in bytes) of the response to a Control Point command. */
-#define MAX_NOTIF_BUFFER_LEN    MAX(MAX_PKTS_RCPT_NOTIF_LEN, MAX_RESPONSE_LEN)  /**< Maximum length (in bytes) of the buffer needed by DFU Service while sending notifications to peer. */
+#define MAX_DFU_PKT_LEN                 (BLEGATT_ATT_MTU_MAX - 3) /**< Maximum length (in bytes) of the DFU Packet characteristic. */
+#define PKT_START_DFU_PARAM_LEN         2                                               /**< Length (in bytes) of the parameters for Packet Start DFU Request. */
+#define PKT_INIT_DFU_PARAM_LEN          2                                               /**< Length (in bytes) of the parameters for Packet Init DFU Request. */
+#define PKT_RCPT_NOTIF_REQ_LEN          3                                               /**< Length (in bytes) of the Packet Receipt Notification Request. */
+#define MAX_PKTS_RCPT_NOTIF_LEN         6                                               /**< Maximum length (in bytes) of the Packets Receipt Notification. */
+#define MAX_RESPONSE_LEN                7                                               /**< Maximum length (in bytes) of the response to a Control Point command. */
+#define MAX_NOTIF_BUFFER_LEN            MAX(MAX_PKTS_RCPT_NOTIF_LEN, MAX_RESPONSE_LEN)  /**< Maximum length (in bytes) of the buffer needed by DFU Service while sending notifications to peer. */
 
 enum
 {
@@ -57,7 +57,8 @@ static uint32_t dfu_pkt_char_add(ble_dfu_t * const p_dfu)
 
     memset(&char_md, 0, sizeof(char_md));
 
-    char_md.char_props.write_wo_resp = 1;
+    char_md.char_props.write         = 1; // For those improved apps that can take advantage of ACK
+    char_md.char_props.write_wo_resp = 1; // Nordic IOS DFU app REQUIRES Write Without Response */
     char_md.p_char_user_desc         = NULL;
     char_md.p_char_pf                = NULL;
     char_md.p_user_desc_md           = NULL;

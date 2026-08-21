@@ -25,26 +25,23 @@
 #ifndef _HELTEC_T1_H
 #define _HELTEC_T1_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(0, 16)
+#define LED_PRIMARY_PIN       PINNUM(0, 16)
 #define LED_STATE_ON          0
 
-// #define LED_NEOPIXEL          _PINNUM(0, 14)
-// #define NEOPIXEL_POWER_PIN    _PINNUM(0, 21)
+// #define LED_NEOPIXEL          PINNUM(0, 14)
+// #define NEOPIXEL_POWER_PIN    PINNUM(0, 21)
 // #define NEOPIXELS_NUMBER      2
 // #define BOARD_RGB_BRIGHTNESS  0x040404
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(1, 10)
-#define BUTTON_2              _PINNUM(1, 2) // stock bootloader has this set to 34
+#define BUTTON_DFU              PINNUM(1, 10)
+#define BUTTON_DFU_OTA              PINNUM(1, 2) // stock bootloader has this set to 34
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
@@ -52,18 +49,18 @@
 //--------------------------------------------------------------------+
 
 // VSensor required to power the display
-#define DISPLAY_VSENSOR_PIN   _PINNUM(0,  13)
+#define DISPLAY_VSENSOR_PIN   PINNUM(0,  13)
 #define DISPLAY_VSENSOR_ON    0 
 
 #define DISPLAY_CONTROLLER_ST7735
 
-#define DISPLAY_PIN_SCK       _PINNUM(1, 0)
-#define DISPLAY_PIN_MOSI      _PINNUM(0, 24)
+#define DISPLAY_PIN_SCK       PINNUM(1, 0)
+#define DISPLAY_PIN_MOSI      PINNUM(0, 24)
 
-#define DISPLAY_PIN_CS        _PINNUM(0, 12)
-#define DISPLAY_PIN_DC        _PINNUM(0, 22)
-#define DISPLAY_PIN_RST       _PINNUM(0, 20)
-#define DISPLAY_PIN_BL        _PINNUM(0, 15)
+#define DISPLAY_PIN_CS        PINNUM(0, 12)
+#define DISPLAY_PIN_DC        PINNUM(0, 22)
+#define DISPLAY_PIN_RST       PINNUM(0, 20)
+#define DISPLAY_PIN_BL        PINNUM(0, 15)
 #define DISPLAY_BL_ON         0  // GPIO state to enable back light
 
 #define DISPLAY_WIDTH         160

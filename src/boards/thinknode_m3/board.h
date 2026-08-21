@@ -23,21 +23,18 @@
 #ifndef _THINKNODE_M3_H
 #define _THINKNODE_M3_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER       1
-#define LED_PRIMARY_PIN   _PINNUM(1, 5) // Blue
+#define LED_PRIMARY_PIN   PINNUM(1, 5) // Blue
 #define LED_STATE_ON      1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER    2               // these pins were reversed from the stock bootloader
-#define BUTTON_1          _PINNUM(0, 11)  // probably unconnected?
-#define BUTTON_2          _PINNUM(0, 12)  // user button
+#define BUTTON_DFU          PINNUM(0, 11)  // probably unconnected?
+#define BUTTON_DFU_OTA          PINNUM(0, 12)  // user button
 #define BUTTON_PULL       NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+

@@ -25,13 +25,11 @@
 #ifndef _TRACKER_L1
 #define _TRACKER_L1
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(1, 1)
+#define LED_PRIMARY_PIN       PINNUM(1, 1)
 #define LED_STATE_ON          1
 
 #define NEOPIXELS_NUMBER      0
@@ -39,9 +37,8 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(0, 8) // user button
-#define BUTTON_2              _PINNUM(0, 8)
+#define BUTTON_DFU              PINNUM(0, 8) // user button
+#define BUTTON_DFU_OTA              PINNUM(0, 8)
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+

@@ -56,7 +56,7 @@ dkms.conf
 
 segger/Output
 _build/
-_bin/
+cmake-build-*/
 bin/
 *.emSession
 *.jlink
@@ -67,7 +67,9 @@ TAGS
 .DS_Store
 Makefile.user
 
-# Python virtual environments
+# Exclude all SoftDevice S340 files
+lib/softdevice/s340*
+_bin/
 venv/
 .python-version
 lib/python3.13/

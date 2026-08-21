@@ -23,23 +23,20 @@
 #ifndef _LILYGO_TECHO_H
 #define _LILYGO_TECHO_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 #define UICR_REGOUT0_VALUE UICR_REGOUT0_VOUT_3V3
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER       1
-#define LED_PRIMARY_PIN   _PINNUM(0, 14) // Blue
+#define LED_PRIMARY_PIN   PINNUM(0, 14) // Blue
 #define LED_STATE_ON      1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER    2  // hold down user button on boot to enter OTA DFU mode.
-#define BUTTON_1          _PINNUM(1, 10)  // user button
-#define BUTTON_2          _PINNUM(1, 10)
+#define BUTTON_DFU          PINNUM(1, 10)  // user button
+#define BUTTON_DFU_OTA          PINNUM(1, 10)
 #define BUTTON_PULL       NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+

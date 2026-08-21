@@ -28,22 +28,19 @@
 // change default 1.8v to 3.3v, add by taylor
 #define UICR_REGOUT0_VALUE UICR_REGOUT0_VOUT_3V3
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER           2
-#define LED_PRIMARY_PIN       _PINNUM(1, 4)
-#define LED_SECONDARY_PIN     _PINNUM(1, 3)
+#define LED_PRIMARY_PIN       PINNUM(1, 4)
+#define LED_SECONDARY_PIN     PINNUM(1, 3)
 #define LED_STATE_ON          1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(0, 9)	// Allow booting to OTA DFU from button
-#define BUTTON_2              _PINNUM(0, 9)	// Allow booting to OTA DFU from button
+#define BUTTON_DFU              PINNUM(0, 9)	// Allow booting to OTA DFU from button
+#define BUTTON_DFU_OTA              PINNUM(0, 9)	// Allow booting to OTA DFU from button
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+

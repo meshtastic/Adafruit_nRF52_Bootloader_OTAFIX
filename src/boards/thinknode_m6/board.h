@@ -23,21 +23,18 @@
 #ifndef _THINKNODE_M6_H
 #define _THINKNODE_M6_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER       1
-#define LED_PRIMARY_PIN   _PINNUM(0, 7) // Blue
+#define LED_PRIMARY_PIN   PINNUM(0, 7) // Blue
 #define LED_STATE_ON      1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER    2  // hold down user button on boot to enter OTA DFU mode.
-#define BUTTON_1          _PINNUM(0, 17)  // user button
-#define BUTTON_2          _PINNUM(0, 17)
+#define BUTTON_DFU          PINNUM(0, 17)  // user button
+#define BUTTON_DFU_OTA          PINNUM(0, 17)
 #define BUTTON_PULL       NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+

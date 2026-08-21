@@ -23,22 +23,19 @@
 #ifndef _THINKNODE_M1_H
 #define _THINKNODE_M1_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER       1
-#define LED_PRIMARY_PIN   _PINNUM(0, 14)  // Blue LED
+#define LED_PRIMARY_PIN   PINNUM(0, 14)  // Blue LED
 #define LED_STATE_ON      0
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER    2
-// #define BUTTON_1          _PINNUM(1, 7)   // Function button (TBN)
-#define BUTTON_1          _PINNUM(1, 10)  // Hold page turn to enter OTA DFU mode.
-#define BUTTON_2          _PINNUM(1, 10)  // Page Turn button
+// #define BUTTON_DFU          PINNUM(1, 7)   // Function button (TBN)
+#define BUTTON_DFU          PINNUM(1, 10)  // Hold page turn to enter OTA DFU mode.
+#define BUTTON_DFU_OTA          PINNUM(1, 10)  // Page Turn button
 #define BUTTON_PULL       NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+

@@ -145,9 +145,19 @@ int32_t tud_msc_write10_cb (uint8_t lun, uint32_t lba, uint32_t offset, uint8_t*
   uint32_t count = 0;
   while ( count < bufsize )
   {
+    int written;
+
     // Consider non-uf2 block write as successful
     // only break if write_block is busy with flashing (return 0)
-    if ( 0 == write_block(lba, buffer, &_wr_state) ) break;
+    written = write_block(lba, buffer, &_wr_state);
+    if ( written > 0 )
+    {
+      bootloader_dfu_activity_mark();
+    }
+    else if ( written == 0 )
+    {
+      break;
+    }
 
     lba++;
     buffer += 512;
@@ -171,6 +181,7 @@ void tud_msc_write10_complete_cb(uint8_t lun)
     dfu_update_status_t update_status;
     memset(&update_status, 0, sizeof(dfu_update_status_t ));
     update_status.status_code = DFU_RESET;
+    update_status.restart_into_bootloader = false;
 
     bootloader_dfu_update_process(update_status);
 
@@ -195,9 +206,10 @@ void tud_msc_write10_complete_cb(uint8_t lun)
       {
         // update bootloader always end with reset
         update_status.status_code = DFU_RESET;
+        update_status.restart_into_bootloader = false;
 
         // Location of current stored new bootloader
-        uint32_t * new_bootloader = (uint32_t *) BOOTLOADER_ADDR_NEW_RECIEVED;
+        uint32_t * new_bootloader = (uint32_t *) BOOTLOADER_ADDR_NEW_RECEIVED;
 
         PRINT_HEX(new_bootloader);
 

@@ -25,13 +25,11 @@
 #ifndef _SEEED_SOLAR_NODE_P1_H
 #define _SEEED_SOLAR_NODE_P1_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(0, 19)
+#define LED_PRIMARY_PIN       PINNUM(0, 19)
 #define LED_STATE_ON          1
 
 #define NEOPIXELS_NUMBER      0
@@ -39,9 +37,8 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(1, 1) // Hold user button while pressing reset to enter OTA DFU mode
-#define BUTTON_2              _PINNUM(1, 1)
+#define BUTTON_DFU              PINNUM(1, 1) // Hold user button while pressing reset to enter OTA DFU mode
+#define BUTTON_DFU_OTA              PINNUM(1, 1)
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+

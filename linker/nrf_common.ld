@@ -123,19 +123,6 @@ SECTIONS
 
     } > RAM
 
-    /* nrfx's gcc_startup_*.S (since nrfx 3.x) copies .data via these
-     * non-double-underscore names, plus three more RAM-loaded regions
-     * (.sdata/.tdata/.fast) this board never places anything into.
-     * Aliased/zero-length here rather than pulled from nrfx's own
-     * nrf_common.ld, which also redefines .noinit/.bss placement that
-     * this bootloader deliberately overrides per-board (see linker/nrf52840.ld). */
-    __data_start   = __data_start__;
-    __data_end     = __data_end__;
-    __data_load_start = __etext;
-    __sdata_start = .; __sdata_end = .; __sdata_load_start = .;
-    __tdata_start = .; __tdata_end = .; __tdata_load_start = .;
-    __fast_start  = .; __fast_end  = .; __fast_load_start  = .;
-
     .bss :
     {
         . = ALIGN(4);
