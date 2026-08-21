@@ -68,12 +68,6 @@ static void pstorage_callback_handler(pstorage_handle_t * p_handle,
         case PSTORAGE_CLEAR_OP_CODE:
             if (m_dfu_state == DFU_STATE_PREPARING)
             {
-                // Special case for lazy erase - mark first page as erased
-                if (dfu_page_erased != NULL && dfu_image_page_count > 0)
-                {
-                    dfu_page_erased[0] = 1;
-                }
-
                 m_functions.cleared();
                 m_dfu_state = DFU_STATE_RDY;
                 if (m_data_pkt_cb != NULL)
@@ -130,35 +124,25 @@ static uint32_t dfu_timer_restart(void)
 }
 
 
-/**@brief   Function for preparing flash before receiving image.
+/**@brief   Function for preparing of flash before receiving SoftDevice image.
  *
- * @details For lazy erase mode (OTA), this sets up the tracking array and erases
- *          only the first page to signal readiness. Subsequent pages are erased 
- *          on-demand when stores target them.
- *          For non-OTA mode, all pages are erased upfront.
+ * @details This function will erase current application area to ensure sufficient amount of
+ *          storage for the SoftDevice image. Upon erase complete a callback will be done.
+ *          See \ref dfu_bank_prepare_t for further details.
  */
 static void dfu_prepare_func_app_erase(uint32_t image_size)
 {
     mp_storage_handle_active = &m_storage_handle_app;
 
+    // Doing a SoftDevice update thus current application must be cleared to ensure enough space
+    // for new SoftDevice.
     m_dfu_state = DFU_STATE_PREPARING;
-    dfu_base_address = m_storage_handle_app.block_id;
 
     if ( is_ota() )
     {
-        // Setup for lazy erase
-        dfu_image_page_count = NRFX_CEIL_DIV(m_image_size, CODE_PAGE_SIZE);
-
-        if (dfu_image_page_count < 1) dfu_image_page_count = 1; // This should not happen
-
-        static uint8_t dfu_page_erased_static[256];
-        dfu_page_erased = dfu_page_erased_static;
-        memset(dfu_page_erased, 0, dfu_image_page_count);
-
-        // Only the first page is erased up front; the rest are erased on demand by pstorage
         uint32_t err_code;
         while(1) {
-            err_code = pstorage_clear(&m_storage_handle_app, CODE_PAGE_SIZE);
+            err_code = pstorage_clear(&m_storage_handle_app, m_image_size);
             if (err_code != NRF_ERROR_NO_MEM)
                 break;
             // No space, wait until an entry in the queue is freed
@@ -295,11 +279,6 @@ uint32_t dfu_init(void)
 
     m_init_packet_length = 0;
     m_image_crc          = 0;
-    
-    // Reset lazy erase state
-    dfu_page_erased = NULL;
-    dfu_image_page_count = 0;
-    dfu_base_address = 0;
 
     err_code = pstorage_register(&storage_module_param, &m_storage_handle_app);
     if (err_code != NRF_SUCCESS)
