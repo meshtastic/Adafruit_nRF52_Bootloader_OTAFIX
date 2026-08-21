@@ -235,12 +235,15 @@ void tud_msc_write10_complete_cb(uint8_t lun)
         // update App
         update_status.status_code = DFU_UPDATE_APP_COMPLETE;
 
-        // Record the real written size so bootloader_settings.bank_0_size
+        // Record the real app span so bootloader_settings.bank_0_size
         // reflects the actual app, not 0 -- ghostfat.c's CURRENT.UF2 uses
-        // this to size its dump to the real app instead of the max region.
-        // 256 mirrors ghostfat.c's UF2_FIRMWARE_BYTES_PER_SECTOR (the UF2
-        // format's fixed payload-per-block size, not board-specific).
-        update_status.app_size = _wr_state.numWritten * 256;
+        // this to size its dump. Measured from DFU_BANK_0_REGION_START like
+        // serial/OTA DFU do, so a CURRENT.UF2 restore (which also carries
+        // the SoftDevice blocks) does not overcount.
+        if ( _wr_state.appEnd > DFU_BANK_0_REGION_START )
+        {
+          update_status.app_size = _wr_state.appEnd - DFU_BANK_0_REGION_START;
+        }
 
         PRINTF("Application update complete\r\n");
       }
