@@ -199,7 +199,14 @@ static uint32_t current_flash_size(void)
     bootloader_settings_t const * boot_setting;
     bootloader_util_settings_get(&boot_setting);
 
+    // bank_0_size counts from DFU_BANK_0_REGION_START (the CRC check and
+    // serial/OTA DFU both define it that way); the dump starts at
+    // USER_FLASH_START, so add the SoftDevice span in between.
     flash_sz = boot_setting->bank_0_size;
+    if ( flash_sz && (flash_sz != 0xFFFFFFFFUL) )
+    {
+      flash_sz += DFU_BANK_0_REGION_START - USER_FLASH_START;
+    }
 
     // Round up to a whole UF2 payload chunk, else the last real chunk of
     // the app would get truncated out of CURRENT.UF2.
@@ -484,6 +491,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       {
         PRINTF("Write addr = 0x%08lX, block = %ld (%ld of %ld)\r\n", bl->targetAddr, bl->blockNo, state->numWritten, bl->numBlocks);
         flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
+        if ( bl->targetAddr + bl->payloadSize > state->appEnd ) state->appEnd = bl->targetAddr + bl->payloadSize;
       }else if ( bl->targetAddr < USER_FLASH_START )
       {
         // do nothing if writing to MBR, occurs when SD hex is included
