@@ -41,6 +41,16 @@ static bool                         m_dfu_timed_out = false;    /**< Boolean fla
 static pstorage_handle_t            m_storage_handle_app;       /**< Pstorage handle for the application area (bank 0). Bank used when updating a SoftDevice w/wo bootloader. Handle also used when swapping received application from bank 1 to bank 0. */
 static pstorage_handle_t          * mp_storage_handle_active;   /**< Pointer to the pstorage handle for the active bank for receiving of data packets. */
 
+// --- Lazy (on-demand) erase for OTA, re-ported onto mainline pstorage ---
+// Only page 0 is erased before START; each later page is erased synchronously the first time a data packet
+// targets it (block here pumping proc_soc for the flash-op event - proc_soc drains only SOC/flash events, not
+// BLE, so there is no re-entrancy). This keeps mainline pstorage untouched and avoids the async pending-buffer
+// state machine the old OTAFIX lazy erase used, which stalled on this base.
+#define DFU_MAX_IMAGE_PAGES 256
+static uint8_t          m_page_erased[DFU_MAX_IMAGE_PAGES];  /**< 1 = page (relative to bank 0) already erased. */
+static uint32_t         m_image_page_count;                  /**< pages spanned by the incoming image. */
+static volatile bool    m_ondemand_erase_busy;               /**< an on-demand page erase is in flight. */
+
 static dfu_callback_t               m_data_pkt_cb;              /**< Callback from DFU Bank module for notification of asynchronous operation such as flash prepare. */
 static dfu_bank_func_t              m_functions;                /**< Structure holding operations for the selected update process. */
 
@@ -66,6 +76,7 @@ static void pstorage_callback_handler(pstorage_handle_t * p_handle,
             break;
 
         case PSTORAGE_CLEAR_OP_CODE:
+            m_ondemand_erase_busy = false;  // release dfu_ensure_page_erased if this was an on-demand erase
             if (m_dfu_state == DFU_STATE_PREPARING)
             {
                 m_functions.cleared();
@@ -130,6 +141,43 @@ static uint32_t dfu_timer_restart(void)
  *          storage for the SoftDevice image. Upon erase complete a callback will be done.
  *          See \ref dfu_bank_prepare_t for further details.
  */
+// Ensure the flash page containing rel_addr (offset into bank 0) is erased before it is written. Erases
+// synchronously the first time the page is seen, pumping proc_soc (SOC/flash events only) until the erase
+// completes. No-op for a page already erased or beyond the image.
+static void dfu_ensure_page_erased(uint32_t rel_addr)
+{
+    uint32_t page = rel_addr / CODE_PAGE_SIZE;
+    if (page >= m_image_page_count || (page < DFU_MAX_IMAGE_PAGES && m_page_erased[page]))
+    {
+        return;
+    }
+
+    pstorage_handle_t h;
+    h.module_id = m_storage_handle_app.module_id;
+    h.block_id  = DFU_BANK_0_REGION_START + page * CODE_PAGE_SIZE;
+
+    m_ondemand_erase_busy = true;
+
+    uint32_t err_code;
+    while (1) {
+        err_code = pstorage_clear(&h, CODE_PAGE_SIZE);
+        if (err_code != NRF_ERROR_NO_MEM)
+            break;
+        // Queue full - drain a slot and retry.
+        while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+            // nothing
+        }
+    }
+    APP_ERROR_CHECK(err_code);
+
+    // Block until this page erase completes (pstorage_callback_handler clears the flag). proc_soc pumps only
+    // flash/SOC events, so the BLE data path is not re-entered while we wait.
+    while (m_ondemand_erase_busy) {
+        proc_soc();
+    }
+    m_page_erased[page] = 1;
+}
+
 static void dfu_prepare_func_app_erase(uint32_t image_size)
 {
     mp_storage_handle_active = &m_storage_handle_app;
@@ -140,9 +188,16 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
 
     if ( is_ota() )
     {
+        // Lazy erase: clear only the first page now so START responds immediately; later pages are erased on
+        // demand (dfu_ensure_page_erased) as data arrives. Erasing the whole region here is the ~20 s stall.
+        m_image_page_count = NRFX_CEIL_DIV(m_image_size, CODE_PAGE_SIZE);
+        if (m_image_page_count > DFU_MAX_IMAGE_PAGES) m_image_page_count = DFU_MAX_IMAGE_PAGES;
+        memset(m_page_erased, 0, sizeof(m_page_erased));
+        m_page_erased[0] = 1;  // erased by the pstorage_clear below (completion transitions PREPARING -> RDY)
+
         uint32_t err_code;
         while(1) {
-            err_code = pstorage_clear(&m_storage_handle_app, m_image_size);
+            err_code = pstorage_clear(&m_storage_handle_app, CODE_PAGE_SIZE);
             if (err_code != NRF_ERROR_NO_MEM)
                 break;
             // No space, wait until an entry in the queue is freed
@@ -423,6 +478,11 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
 
             if ( is_ota() )
             {
+                // Erase the destination page(s) on demand before writing (handles a packet that straddles a
+                // page boundary).
+                dfu_ensure_page_erased(m_data_received);
+                dfu_ensure_page_erased(m_data_received + data_length - 1);
+
                 while(1) {
                     err_code = pstorage_store(mp_storage_handle_active, (uint8_t *)p_data, data_length, m_data_received);
                     if (err_code != NRF_ERROR_NO_MEM)
