@@ -52,6 +52,7 @@ SOFTWARE.
 typedef struct {
     uint32_t numBlocks;
     uint32_t numWritten;
+    uint32_t appEnd;          // highest end address written in app space (0 if none)
 
     bool aborted;             // aborting update and reset
     bool update_bootloader;   // if updating bootloader (else app)
