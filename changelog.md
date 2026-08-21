@@ -3,6 +3,11 @@
 OTAFIX 2.1–2.3 are Meshtastic's fork; everything from 0.6.2 down predates
 it and is upstream Adafruit history, kept for provenance.
 
+## OTAFIX 2.3-BP1.6
+
+- `CURRENT.UF2` is now sized from the application start instead of counting every UF2 block written since the start of flash. Previously, a dump taken after a serial or BLE OTA update was silently truncated by the SoftDevice span, and restoring such a dump only worked while the missing tail happened to still be in flash — re-take any backups made with BP1.5 or older after a DFU update. Verified on RAK4631 both directions (dump size correct after serial DFU; restore boots, next dump byte-identical).
+- `lib/tinyusb` digest bump (0.21.0-241-g7800876). Exercised on hardware via UF2 mass-storage flashing, USB CDC, and serial DFU on RAK4631.
+
 ## OTAFIX 2.3
 
 - New boards: Heltec T096, Heltec T1, RAK 3401 (merged from oltaco's upstream, which calls this same board-support work "OTAFIX 2.3" too).
