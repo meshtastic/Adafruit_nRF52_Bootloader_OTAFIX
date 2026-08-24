@@ -75,6 +75,7 @@ bootloader and SoftDevice zip package").
 - Heltec T114 / HT-nRF5262
 - LilyGO T-Echo
 - Minewsemi MX25LE01
+- MuziWorks Base Uno / Base Duo / Superbase
 - Nologo ProMicro NRF52840 (aka SuperMini NRF52840)
 - RAK 3401
 - RAK 4631 ([See note](#notes-on-rak4631-bootloader))
@@ -101,6 +102,7 @@ When in OTA DFU mode, devices advertise using a board-specific name rather than 
 | Heltec T114                  | `T114_DFU`               |
 | LILYGO T-Echo                | `LGTE_DFU`               |
 | Minewsemi MX25LE01           | `MX25_DFU`               |
+| MuziWorks Base / Superbase   | `MUZI_DFU`               |
 | ProMicro NRF52840            | `PROM_DFU`               |
 | RAK 4631                     | `4631_DFU`               |
 | RAK 3401                     | `3401_DFU`               |
