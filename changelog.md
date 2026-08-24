@@ -3,6 +3,11 @@
 OTAFIX 2.1–2.3 are Meshtastic's fork; everything from 0.6.2 down predates
 it and is upstream Adafruit history, kept for provenance.
 
+## Unreleased
+
+- Add MuziWorks Base Uno, Base Duo, and Superbase support with the original
+  MuziWorks USB/UF2 identity and the `MUZI_DFU` BLE advertising name.
+
 ## OTAFIX 2.3-BP1.6
 
 - `CURRENT.UF2` is now sized from the application start instead of counting every UF2 block written since the start of flash. Previously, a dump taken after a serial or BLE OTA update was silently truncated by the SoftDevice span, and restoring such a dump only worked while the missing tail happened to still be in flash — re-take any backups made with BP1.5 or older after a DFU update. Verified on RAK4631 both directions (dump size correct after serial DFU; restore boots, next dump byte-identical).
