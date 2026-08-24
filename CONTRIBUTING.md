@@ -40,8 +40,8 @@ Board names are the directory names under `src/boards/`. `tools/build_all.py`
 builds every board and prints a pass/fail + size table — run it before
 opening a PR; it's the same check CI's board matrix does per-PR, just local.
 
-**Use `make`, not `cmake`.** `CMakeLists.txt` only has a `board.cmake` for 2
-of the 14 boards; `cmake -DBOARD=<anything else>` fails outright. Nobody
+**Use `make`, not `cmake`.** `CMakeLists.txt` only has a `board.cmake` for 4
+of the 18 boards; `cmake -DBOARD=<anything else>` fails outright. Nobody
 uses the CMake path in practice.
 
 There is no lint or test suite — for a bootloader, "does it compile for
