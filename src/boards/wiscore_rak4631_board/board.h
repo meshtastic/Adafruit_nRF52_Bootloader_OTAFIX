@@ -46,6 +46,36 @@
 #define BUTTON_2              _PINNUM(0, 8)	// change default 0.0 to 0.8, add by Michael. This pin is not connected on 4631. 
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
+/*------------------------------------------------------------------*/
+/* DISPLAY - optional SSD1306 OLED (RAK1921) on a WisBlock IO slot
+ *
+ * The panel is a plug-in module, so this is best-effort: board_display_init()
+ * probes the I2C address and reports absence rather than blocking, and a
+ * board with an empty slot behaves exactly as it did before.
+ *------------------------------------------------------------------*/
+#define DISPLAY_CONTROLLER_SSD1306
+
+// WB_I2C1, shared by the sensor and IO slots.
+#define DISPLAY_PIN_SDA       _PINNUM(0, 13)
+#define DISPLAY_PIN_SCL       _PINNUM(0, 14)
+#define DISPLAY_I2C_ADDR      0x3C
+
+// The slots are fed from the switchable 3V3_S rail (WB_IO2), which is off
+// out of reset - the bootloader has to raise it before the panel answers.
+#define DISPLAY_VSENSOR_PIN   _PINNUM(0, 34)
+#define DISPLAY_VSENSOR_ON    1
+
+#define DISPLAY_WIDTH         128
+#define DISPLAY_HEIGHT        64
+// This panel has 132 columns of GDDRAM behind 128px of glass, so the visible
+// window starts at column 2. Confirmed on hardware: with an offset of 0 the
+// image sat 2px left of the glass and the two uncovered columns on the right
+// showed power-up garbage.
+#define DISPLAY_COL_OFFSET    2
+#define DISPLAY_GDDRAM_WIDTH  132
+
+#define DISPLAY_TITLE         "RAK4631"
+
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+

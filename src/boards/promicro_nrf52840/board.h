@@ -44,6 +44,30 @@
 #define BUTTON_2          _PINNUM(1, 0)
 #define BUTTON_PULL       NRF_GPIO_PIN_PULLUP
 
+/*------------------------------------------------------------------*/
+/* DISPLAY - optional SSD1306/SH1106 OLED (commonly user-wired)
+ *
+ * Pins follow the default Meshtastic promicro variant. The EASYPROMICRO
+ * arrangement puts SCL on P1.06 instead; on such a board the probe simply
+ * finds nothing and the screen stays blank, which is harmless.
+ *------------------------------------------------------------------*/
+#define DISPLAY_CONTROLLER_SSD1306
+#define DISPLAY_I2C_ADDR      0x3C
+
+#define DISPLAY_PIN_SDA       _PINNUM(1, 4)
+#define DISPLAY_PIN_SCL       _PINNUM(0, 11)
+
+#define DISPLAY_WIDTH         128
+#define DISPLAY_HEIGHT        64
+// Not yet verified on hardware. Offset 0 is right for a true 128-column
+// SSD1306; a 132-column SH1106 will sit 2px left of centre, in which case set
+// DISPLAY_COL_OFFSET to 2. Blanking spans 132 either way so no uncovered
+// column can show power-up garbage.
+#define DISPLAY_COL_OFFSET    0
+#define DISPLAY_GDDRAM_WIDTH  132
+
+#define DISPLAY_TITLE         "ProMicro"
+
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+

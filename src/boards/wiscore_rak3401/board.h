@@ -46,6 +46,32 @@
 #define BUTTON_2              _PINNUM(0, 8)	// change default 0.0 to 0.8, add by Michael. This pin is not connected on 4631. 
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
+/*------------------------------------------------------------------*/
+/* DISPLAY - optional SSD1306 OLED on a WisBlock IO slot
+ *
+ * Pin- and rail-identical to the RAK4631; the panel is a plug-in module, so
+ * board_display_init() probes for it and a board with an empty slot behaves
+ * exactly as it did before.
+ *------------------------------------------------------------------*/
+#define DISPLAY_CONTROLLER_SSD1306
+#define DISPLAY_I2C_ADDR      0x3C
+
+// WB_I2C1, shared by the sensor and IO slots.
+#define DISPLAY_PIN_SDA       _PINNUM(0, 13)
+#define DISPLAY_PIN_SCL       _PINNUM(0, 14)
+
+// Switchable 3V3_S rail (WB_IO2), off out of reset.
+#define DISPLAY_VSENSOR_PIN   _PINNUM(0, 34)
+#define DISPLAY_VSENSOR_ON    1
+
+#define DISPLAY_WIDTH         128
+#define DISPLAY_HEIGHT        64
+// Untested here, but the RAK4631's WisBlock OLED measured as 132-column.
+#define DISPLAY_COL_OFFSET    2
+#define DISPLAY_GDDRAM_WIDTH  132
+
+#define DISPLAY_TITLE         "RAK3401"
+
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+

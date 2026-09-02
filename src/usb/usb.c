@@ -97,9 +97,10 @@ void usb_init(bool cdc_only) {
   uf2_init();
   tusb_init();
 
-  #ifdef DISPLAY_PIN_SCK
-  board_display_init();
-  screen_draw_drag();
+  #ifdef BOARD_HAS_DISPLAY
+  if (board_display_init()) {
+    screen_draw_drag();
+  }
   #endif
 }
 
