@@ -48,6 +48,7 @@
 #include "dfu_transport.h"
 #include "bootloader.h"
 #include "bootloader_util.h"
+#include "dfu_magic.h"
 
 #include "nrf.h"
 #include "nrf_soc.h"
@@ -75,6 +76,7 @@
 
 void usb_init(bool cdc_only);
 void usb_teardown(void);
+bool msc_factory_erase_pending(void);
 
 // tinyusb function that handles power event (detected, ready, removed)
 // We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled.
@@ -83,6 +85,7 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 #else
 #define usb_init(x)       led_state(STATE_USB_MOUNTED) // mark nrf52832 as mounted
 #define usb_teardown()
+#define msc_factory_erase_pending() false
 
 #endif
 
@@ -94,23 +97,6 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
  * - Factory Reset  : LED Status blink 2x fast
  * - Fatal Error    : LED Status & Conn blink one after another
  */
-
-/* Magic that written to NRF_POWER->GPREGRET by application when it wish to go into DFU
- * - DFU_MAGIC_OTA_APPJUM        : used by BLEDfu service, SD is already inited
- * - DFU_MAGIC_OTA_RESET         : entered by soft reset, SD is not inited yet
- * - DFU_MAGIC_SERIAL_ONLY_RESET : with CDC interface only
- * - DFU_MAGIC_UF2_RESET         : with CDC and MSC interfaces
- * - DFU_MAGIC_SKIP              : skip DFU entirely including double reset delay,
- *                                 Can be used with systemoff or quick reset to app
- *
- * Note: for DFU_MAGIC_OTA_APPJUM Softdevice must not initialized.
- * since it is already in application. In all other case of OTA SD must be initialized
- */
-#define DFU_MAGIC_OTA_APPJUM            BOOTLOADER_DFU_START  // 0xB1
-#define DFU_MAGIC_OTA_RESET             0xA8
-#define DFU_MAGIC_SERIAL_ONLY_RESET     0x4e
-#define DFU_MAGIC_UF2_RESET             0x57
-#define DFU_MAGIC_SKIP                  0x6d
 
 #define DFU_DBL_RESET_MAGIC             0x5A1AD5      // SALADS
 #define DFU_DBL_RESET_APP               0x4ee5677e
@@ -320,6 +306,13 @@ static void check_dfu_mode(void) {
       usb_teardown(); // allow booting to app after ota even if usb is connected
     } else {
       usb_teardown();
+
+      // Factory erase done (msc_uf2.c): USB is detached cleanly, now come
+      // back as a UF2 drive for the firmware install.
+      if (msc_factory_erase_pending()) {
+        NRF_POWER->GPREGRET = DFU_MAGIC_UF2_RESET;
+        NVIC_SystemReset();
+      }
     }
   }
 }
