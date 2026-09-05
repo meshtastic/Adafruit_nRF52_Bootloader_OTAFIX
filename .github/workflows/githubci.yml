@@ -39,26 +39,40 @@ jobs:
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
   # The factory-erase UF2 is one file for every board, so it is checked in and
-  # attached once here rather than by each of the 17 build jobs (which would
-  # race deleting and re-uploading the same asset name). Not a required
+  # attached once (below) rather than by each of the 17 build jobs, which would
+  # race deleting and re-uploading the same asset name. This check runs on
+  # every PR with a read-only token; the upload is a separate release-only job
+  # so PR-modifiable code never runs with contents: write. Not a required
   # status check on master unless a human adds it to branch protection.
   factory-erase-uf2:
     runs-on: ubuntu-latest
-    # Only the upload step needs write access; the cmp check runs on PRs too.
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Check the committed file matches the generator
         run: |
           python3 tools/make_factory_erase_uf2.py /tmp/meshtastic_factory_erase.uf2
           cmp /tmp/meshtastic_factory_erase.uf2 tools/meshtastic_factory_erase.uf2
 
+  factory-erase-uf2-release:
+    needs: factory-erase-uf2
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' }}
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Upload Release Asset
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
-        if: ${{ github.event_name == 'release' }}
         with:
           files: tools/meshtastic_factory_erase.uf2
 
