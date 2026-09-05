@@ -28,6 +28,8 @@
 #if CFG_TUD_MSC
 
 #include "bootloader.h"
+#include "nrfx_nvmc.h"
+#include "app_timer.h"
 
 /*------------------------------------------------------------------*/
 /* MACRO TYPEDEF CONSTANT ENUM
@@ -37,6 +39,36 @@
 /* UF2
  *------------------------------------------------------------------*/
 static WriteState _wr_state = { 0 };
+
+// Factory erase has run; the reset into UF2 mode is pending. Deferred so the
+// host's trailing FAT/directory writes are still acked (they hit a device
+// that is already gone otherwise), then main.c resets after usb_teardown().
+static bool _factory_erase_done = false;
+APP_TIMER_DEF(_factory_erase_timer);
+
+// Window in which the host can finish its writes or eject before we reset.
+// The RP2040 bootrom waits 1000 ms after the last block for the same reason.
+#define FACTORY_ERASE_RESET_DELAY_MS   500
+
+bool msc_factory_erase_pending(void)
+{
+  return _factory_erase_done;
+}
+
+// Leave the DFU event loop; check_dfu_mode() tears USB down and resets.
+static void factory_erase_reset_now(void)
+{
+  dfu_update_status_t update_status;
+  memset(&update_status, 0, sizeof(dfu_update_status_t));
+  update_status.status_code = DFU_RESET;
+  bootloader_dfu_update_process(update_status);
+}
+
+static void factory_erase_timer_handler(void *p_context)
+{
+  (void) p_context;
+  factory_erase_reset_now();
+}
 
 void read_block(uint32_t block_no, uint8_t *data);
 int  write_block(uint32_t block_no, uint8_t *data, WriteState *state);
@@ -176,6 +208,36 @@ void tud_msc_write10_complete_cb(uint8_t lun)
 
     led_state(STATE_WRITING_FINISHED);
   }
+  else if ( _wr_state.factory_erase )
+  {
+    // Factory erase: wipe the whole App Data reservation. On nRF52840 that is
+    // 10 pages: LittleFS (config, keys, bonds) in the top 7 at 0xED000, and
+    // firmware's WarmNodeStore node-DB ring in the 3 below it at 0xEA000.
+    // Erase the bootloader's own bound, never a filesystem size - shrinking
+    // this loop to the LittleFS pages would leave a stale node DB behind.
+    // The application code and bootloader settings are left alone, so a
+    // device unplugged here boots its app factory-fresh; otherwise it comes
+    // back as a UF2 drive ready for a firmware install, as the old erase
+    // sketch did. Runs here, not in write_block, so the host has already
+    // acked the write.
+    PRINTF("Factory erase: App Data 0x%08lX-0x%08lX\r\n", (uint32_t) USER_FLASH_END, (uint32_t) BOOTLOADER_REGION_START);
+    led_state(STATE_WRITING_STARTED);
+
+    for ( uint32_t addr = USER_FLASH_END; addr < BOOTLOADER_REGION_START; addr += CODE_PAGE_SIZE )
+    {
+      nrfx_nvmc_page_erase(addr);
+    }
+
+    led_state(STATE_WRITING_FINISHED);
+
+    // The host's follow-up FAT/directory writes complete through this callback
+    // too: forget the erase block entirely, or the numBlocks branch below would
+    // treat "1 of 1 written" as a finished app update and zero bank_0_size.
+    memset(&_wr_state, 0, sizeof(_wr_state));
+    _factory_erase_done = true;
+    app_timer_create(&_factory_erase_timer, APP_TIMER_MODE_SINGLE_SHOT, factory_erase_timer_handler);
+    app_timer_start(_factory_erase_timer, APP_TIMER_TICKS(FACTORY_ERASE_RESET_DELAY_MS), NULL);
+  }
   else if ( _wr_state.numBlocks )
   {
     // Start LED writing pattern with first write
@@ -268,7 +330,13 @@ bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start, boo
       // load disk storage
     }else
     {
-      // unload disk storage
+      // unload disk storage: the host ejected us. If a factory erase is
+      // waiting on its timer, this is the clean moment to go.
+      if ( _factory_erase_done )
+      {
+        app_timer_stop(_factory_erase_timer);
+        factory_erase_reset_now();
+      }
     }
   }
 

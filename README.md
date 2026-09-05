@@ -50,6 +50,10 @@ installed three different ways:
 | **Serial DFU** | USB, appears as a serial port | Recovery, and flashing a full bootloader+SoftDevice package with `adafruit-nrfutil` — see [Installation](#installation) |
 | **BLE OTA DFU** | Bluetooth, no cable needed | The Meshtastic Android app's firmware/bootloader update, and any Nordic DFU app — see [below](#bootloader-upgrade-from-the-meshtastic-android-app) and [recommended settings](#recommended-ota-dfu-settings) |
 
+There is also one thing the UF2 drive accepts that is *not* an image: the
+[factory-erase file](#factory-erase), which wipes the application's saved
+data in place and leaves everything else alone.
+
 BLE OTA DFU is the only *wireless* path, which is what the "OTA" in
 "OTAFIX" refers to — and it's also the bootloader's default fallback: since
 **OTAFIX 2.0**, if no valid application is present, the device waits in BLE
@@ -118,6 +122,12 @@ The recommended way to install the bootloader is using the UF2 file.
 Download the UF2 file for your board (they can be found in the [releases](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/releases) with filenames beginning with `update-`), enter UF2 mode (usually by double pressing the reset button within 0.5s) and copy the UF2 file across.
 
 If an incorrect bootloader has been flashed to the device, a full bootloader and SoftDevice zip package will need to be flashed using ``adafruit-nrfutil``.
+
+### Factory erase
+
+To wipe the device's saved data — config, node DB, keys, BLE bonds — without a serial terminal or a special erase firmware: enter UF2 mode and copy [`meshtastic_factory_erase.uf2`](./tools/meshtastic_factory_erase.uf2) (also attached to every [release](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/releases)) onto the drive. The bootloader erases the application's data region, then reboots straight back into UF2 mode so you can copy the firmware across next. The application itself is left in place, so if you unplug instead, it boots factory-fresh. Copy this file on its own: the drive detaches about half a second after the copy finishes (or as soon as you eject it) and comes back a second or two later.
+
+The file is the same for every board. It is a single UF2 block with family ID `0x4D455348` and no payload; a bootloader that predates this feature ignores it silently — check `INFO_UF2.TXT` on the drive for a `Factory-Erase:` line to know whether yours supports it. Regenerate it with `tools/make_factory_erase_uf2.py` (or `make factory-erase-uf2`).
 
 ---
 

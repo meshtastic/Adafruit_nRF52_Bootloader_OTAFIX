@@ -375,7 +375,7 @@ INC_PATHS = $(addprefix -I,$(IPATH))
 # BUILD TARGETS
 #------------------------------------------------------------------------------
 
-.PHONY: all clean flash flash-dfu flash-sd flash-mbr dfu-flash sd mbr gdbflash gdb
+.PHONY: all clean flash flash-dfu flash-sd flash-mbr dfu-flash sd mbr gdbflash gdb factory-erase-uf2
 
 # default target to build
 all: $(BUILD)/$(OUT_NAME).out $(BUILD)/$(OUT_NAME)_nosd.hex $(BUILD)/update-$(OUT_NAME)_nosd.uf2 $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).zip
@@ -444,6 +444,10 @@ $(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_NAME).hex
 #-------------- Artifacts --------------
 $(BIN):
 	@$(MKDIR) -p $@
+
+# Board-agnostic factory-erase request file (see tools/make_factory_erase_uf2.py)
+factory-erase-uf2:
+	@python3 tools/make_factory_erase_uf2.py
 
 copy-artifact: $(BIN)
 	@$(CP) $(BUILD)/update-$(OUT_NAME)_nosd.uf2 $(BIN)
