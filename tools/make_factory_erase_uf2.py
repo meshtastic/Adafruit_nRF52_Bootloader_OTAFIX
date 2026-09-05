@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Emit the Meshtastic factory-erase UF2.
 
-A single UF2 block with family ID 0x4D455348 ("MESH"). The bootloader flashes
+A single UF2 block with family ID CFG_UF2_MESHTASTIC_ERASE_ID (0x4D455348, "MESH"),
+read from src/usb/uf2/uf2cfg.h. The bootloader flashes
 nothing from it: it erases its App Data reservation (the application's
 LittleFS) and reboots into UF2 mode -- see src/usb/uf2/ghostfat.c and
 src/usb/msc_uf2.c. The file is board-agnostic, so one copy serves every board.
@@ -9,6 +10,7 @@ Older bootloaders do not know the family and ignore the block.
 
     tools/make_factory_erase_uf2.py [OUTPUT]   (default: tools/meshtastic_factory_erase.uf2)
 """
+import re
 import struct
 import sys
 from pathlib import Path
@@ -17,8 +19,22 @@ UF2_MAGIC_START0 = 0x0A324655
 UF2_MAGIC_START1 = 0x9E5D5157
 UF2_MAGIC_END = 0x0AB16F30
 UF2_FLAG_FAMILYID = 0x00002000
-FAMILY_ID = 0x4D455348  # CFG_UF2_MESHTASTIC_ERASE_ID
 PAYLOAD_SIZE = 256      # the bootloader rejects any other payloadSize
+
+REPO = Path(__file__).resolve().parent.parent
+UF2CFG = REPO / "src" / "usb" / "uf2" / "uf2cfg.h"
+
+
+def family_id() -> int:
+    """CFG_UF2_MESHTASTIC_ERASE_ID, read from the header the bootloader compiles, so
+    the two cannot drift apart."""
+    m = re.search(r"^#define\s+CFG_UF2_MESHTASTIC_ERASE_ID\s+(0x[0-9A-Fa-f]+)", UF2CFG.read_text(), re.M)
+    if not m:
+        sys.exit(f"CFG_UF2_MESHTASTIC_ERASE_ID not found in {UF2CFG}")
+    return int(m.group(1), 16)
+
+
+FAMILY_ID = family_id()
 
 
 def block() -> bytes:
