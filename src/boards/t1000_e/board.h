@@ -37,15 +37,30 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
+/* P0.06 is active high with an internal pull-down. Firmware agrees:
+ * variants/nrf52840/tracker-t1000-e/variant.h sets BUTTON_ACTIVE_LOW false and
+ * BUTTON_SENSE_TYPE 0x5. The previous NRF_GPIO_PIN_PULLUP made button_pressed()
+ * compare against an active_state of 0 on a pin that can only ever read 1, so
+ * the button was never seen here at all.
+ *
+ * P0.18 is RESET and is not exposed as a second button, so double-reset entry
+ * is unavailable and the primary button is the only way in. A momentary press
+ * belongs to the application, so this board uses the hold-to-enter scheme (see
+ * BUTTON_DFU_HOLD in src/main.c), which also compiles out the BUTTON_FRESET
+ * reads - P0.18 sits high and would otherwise read as permanently pressed.
+ * BUTTON_2 is aliased only to satisfy the BUTTONS_NUMBER >= 2 check. */
 #define BUTTONS_NUMBER        2
 #define BUTTON_1              _PINNUM(0, 6)  // Primary Button
-#define BUTTON_2              _PINNUM(0, 18) // unusable: RESET
-#define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
+#define BUTTON_2              BUTTON_1       // no usable second button, P0.18 is RESET
+#define BUTTON_PULL           NRF_GPIO_PIN_PULLDOWN
 
-/* P0.18 is RESET and is not exposed as a button, so there is no way to reset
- * out of UF2 mode once in it, and the host just re-mounts the drive if we stay
- * enumerated. Ejecting the drive therefore leaves DFU and boots the
- * application. */
+// Hold the primary button through boot for this long to force UF2 DFU.
+#define BUTTON_DFU_HOLD       BUTTON_1
+#define BUTTON_DFU_HOLD_MS    3000
+
+/* With no RESET button there is also no way to reset out of UF2 mode once in
+ * it, and the host just re-mounts the drive if we stay enumerated. Ejecting the
+ * drive therefore leaves DFU and boots the application. */
 #define UF2_EXIT_ON_EJECT
 
 //--------------------------------------------------------------------+
