@@ -18,6 +18,7 @@ Current release: **OTAFIX 2.3** — see [changelog.md](changelog.md) for version
 - [Recommended OTA DFU settings](#recommended-ota-dfu-settings)
 - [Notes on Xiao NRF52840 BLE](#notes-on-xiao-nrf52840-ble)
 - [Notes on RAK4631 bootloader](#notes-on-rak4631-bootloader)
+- [Notes on MeshTracker X1 DFU entry](#notes-on-meshtracker-x1-dfu-entry)
 - [Contributing](#contributing)
 - [Getting help](#getting-help)
 - [License](#license)
@@ -84,6 +85,7 @@ bootloader and SoftDevice zip package").
 - RAK 4631 ([See note](#notes-on-rak4631-bootloader))
 - RAK WisMesh Tag
 - Seeed Studio SenseCAP Card Tracker T1000-E
+- Seeed Studio SenseCAP MeshTracker X1 ([See note](#notes-on-meshtracker-x1-dfu-entry))
 - Seeed SenseCAP Solar Node P1
 - Seeed Studio Wio Tracker L1
 - Seeed Studio XIAO nRF52840 BLE ([See note](#notes-on-xiao-nrf52840-ble))
@@ -110,6 +112,7 @@ When in OTA DFU mode, devices advertise using a board-specific name rather than 
 | RAK 3401                     | `3401_DFU`               |
 | RAK WisMesh Tag              | `RTAG_DFU`               |
 | Seeed SenseCAP Solar Node P1 | `SCAP_DFU`               |
+| Seeed MeshTracker X1         | `MTX1_DFU`               |
 | Seeed T1000e                 | `T1KE_DFU`               |
 | Seeed WioTracker L1          | `WTL1_DFU`               |
 | XIAO NRF52 BLE / SENSE       | `XIAO_DFU`               |
@@ -230,6 +233,12 @@ If the file shows: "Board-ID: nRF52840-SeeedXiaoSense-v1" then the ***SENSE*** v
 ## Notes on RAK4631 bootloader
 
 This version of the RAK4631 bootloader is based on a much newer version (0.9.2) of the Adafruit nRF52 bootloader than what RAK Wireless uses on their official bootloader (0.6.2-11). It has been tested with no problems found; whether RAK's own patches to the Adafruit bootloader introduce any behavioral difference has not been investigated. A variant of the official RAK bootloader with these patches included instead is available [here](https://github.com/oltaco/WisCore_RAK4631_Bootloader/releases).
+
+## Notes on MeshTracker X1 DFU entry
+
+The X1 has a single user button, and its RESET line is not exposed as a second button, so **double-press reset does not work on this board**. Instead, hold the primary button down while the device boots: keep holding for about 3 seconds and the bootloader enters UF2 DFU mode and mounts the mass-storage drive. Releasing the button before then boots the application as normal.
+
+Because a momentary press belongs to the application, a short press will *not* enter DFU — it has to be an uninterrupted hold through boot.
 
 ---
 
