@@ -114,8 +114,10 @@ Renovate will keep proposing. nrfx 4.0 restructured the entire repo layout
 repo's Makefile `IPATH`s and every board's linker script reworked, not just
 a digest bump. v3.14.0 is the last tag on the pre-4.0 layout, so it's the
 practical ceiling for a same-day bump; going past it is a real project, not
-a Renovate merge. If a future Renovate PR targets nrfx ≥4.0, that's this
-gotcha firing — don't merge it without doing that rework.
+a Renovate merge. `renovate.json` disables `lib/nrfx` updates for exactly this
+reason, so no nrfx bump PR should appear at all; if one does, that rule has
+broken and the PR still must not be merged without the rework. Drop the rule
+when the rework lands. `lib/tinyusb` and `lib/uf2` are unaffected.
 
 `lib/tinyusb`'s `nrf5x` USB port (`dcd_nrf5x.c`) calls nrfx's chip-specific
 errata functions (e.g. `nrf52_errata_199()`) — bumping tinyusb alone,
