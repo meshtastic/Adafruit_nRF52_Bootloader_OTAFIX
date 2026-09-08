@@ -81,7 +81,7 @@ bootloader and SoftDevice zip package").
 - LilyGO T-Echo
 - Minewsemi MX25LE01
 - MuziWorks Base Uno / Base Duo / Superbase
-- Meshtastic Generic
+- Meshtastic Generic SoftDevive v6.1.1 and v7.3.0
 - Nologo ProMicro NRF52840 (aka SuperMini NRF52840)
 - RAK 3401
 - RAK 4631 ([See note](#notes-on-rak4631-bootloader))
