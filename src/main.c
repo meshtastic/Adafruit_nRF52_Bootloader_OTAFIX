@@ -106,6 +106,16 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 #define BOOTLOADER_VERSION_REGISTER     NRF_TIMER2->CC[0]
 #define DFU_SERIAL_STARTUP_INTERVAL     1000
 
+// Poll interval for boards using the BUTTON_DFU_HOLD hold-to-enter-DFU scheme.
+#ifndef BUTTON_DFU_HOLD_POLL_MS
+#define BUTTON_DFU_HOLD_POLL_MS         50
+#endif
+
+// How long the hold must last is a per-board decision, so there is no default.
+#if defined(BUTTON_DFU_HOLD) && !defined(BUTTON_DFU_HOLD_MS)
+#error "BUTTON_DFU_HOLD requires BUTTON_DFU_HOLD_MS (hold duration, ms) in board.h"
+#endif
+
 // Allow for using reset button essentially to swap between application and bootloader.
 // This is controlled by a flag in the app and is the behavior of CPX and all Arcade boards when using MakeCode.
 // DFU_DBL_RESET magic is used to determined which mode is entered
@@ -217,7 +227,7 @@ static void check_dfu_mode(void) {
 
   // Serial only mode
   bool const serial_only_dfu = (gpregret == DFU_MAGIC_SERIAL_ONLY_RESET);
-  bool const uf2_dfu         = (gpregret == DFU_MAGIC_UF2_RESET);
+  bool       uf2_dfu         = (gpregret == DFU_MAGIC_UF2_RESET);
   bool const dfu_skip        = (gpregret == DFU_MAGIC_SKIP);
 
   bool const reason_reset_pin = (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk) ? true : false;
@@ -231,14 +241,44 @@ static void check_dfu_mode(void) {
   if (dfu_start || dfu_skip) NRF_POWER->GPREGRET = 0;
 
   // skip dfu entirely
+#if defined(BUTTON_DFU_HOLD)
+  // The application sets DFU_MAGIC_SKIP before System OFF, and waking from
+  // System OFF is a reset, so the first boot after a button power-off arrives
+  // here with dfu_skip set. Returning now would swallow that boot's hold, so
+  // fall through while the button is down and let the hold below decide.
+  if (dfu_skip && !button_pressed(BUTTON_DFU_HOLD)) return;
+#else
   if (dfu_skip) return;
+#endif
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
+#if defined(BUTTON_DFU_HOLD)
+  // Boards that expose no usable second button (RESET is wired to the MCU
+  // RESET pin, so double-reset entry is unavailable) reach DFU by holding the
+  // primary button through boot instead. A momentary press belongs to the
+  // application, so the plain BUTTON_DFU / BUTTON_FRESET checks below are
+  // skipped: only an uninterrupted hold of BUTTON_DFU_HOLD_MS enters DFU, and
+  // it selects UF2 rather than the OTA default so the mass-storage drive comes
+  // up. Releasing the button early boots the application as normal.
+  if (!dfu_start) {
+    uint32_t held_ms = 0;
+    while (button_pressed(BUTTON_DFU_HOLD)) {
+      if (held_ms >= BUTTON_DFU_HOLD_MS) {
+        dfu_start = true;
+        uf2_dfu   = true;
+        break;
+      }
+      NRFX_DELAY_MS(BUTTON_DFU_HOLD_POLL_MS);
+      held_ms += BUTTON_DFU_HOLD_POLL_MS;
+    }
+  }
+#else
   // DFU button pressed
   dfu_start = dfu_start || button_pressed(BUTTON_DFU);
 
   // DFU + FRESET are pressed --> OTA
   _ota_dfu = _ota_dfu || (button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET));
+#endif
 
   bool const valid_app = bootloader_app_is_valid();
   bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
