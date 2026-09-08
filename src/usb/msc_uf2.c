@@ -55,13 +55,19 @@ bool msc_factory_erase_pending(void)
   return _factory_erase_done;
 }
 
-// Leave the DFU event loop; check_dfu_mode() tears USB down and resets.
-static void factory_erase_reset_now(void)
+// Leave the DFU event loop. check_dfu_mode() then tears USB down and either
+// resets (factory erase pending) or falls through to booting the application.
+static void dfu_leave_event_loop(void)
 {
   dfu_update_status_t update_status;
   memset(&update_status, 0, sizeof(dfu_update_status_t));
   update_status.status_code = DFU_RESET;
   bootloader_dfu_update_process(update_status);
+}
+
+static void factory_erase_reset_now(void)
+{
+  dfu_leave_event_loop();
 }
 
 static void factory_erase_timer_handler(void *p_context)
@@ -337,6 +343,15 @@ bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start, boo
         app_timer_stop(_factory_erase_timer);
         factory_erase_reset_now();
       }
+#ifdef UF2_EXIT_ON_EJECT
+      else
+      {
+        // Boards with no usable RESET button cannot leave UF2 mode by resetting,
+        // and the host will simply re-mount the drive if we stay enumerated. Treat
+        // the eject as "done here" and leave the DFU loop so the application boots.
+        dfu_leave_event_loop();
+      }
+#endif
     }
   }
 
