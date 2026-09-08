@@ -3,6 +3,11 @@
 OTAFIX 2.1–2.4 are Meshtastic's fork; everything from 0.6.2 down predates
 it and is upstream Adafruit history, kept for provenance.
 
+## Unreleased
+
+- Add MuziWorks Base Uno, Base Duo, and Superbase support with the original
+  MuziWorks USB/UF2 identity and the `MUZI_DFU` BLE advertising name.
+
 ## OTAFIX 2.4
 
 - New board: Seeed Studio SenseCAP MeshTracker X1 (OTA DFU advertising name `MTX1_DFU`). The X1 exposes one user button and no usable RESET button, so double-press reset cannot reach DFU. It instead opts into a new `BUTTON_DFU_HOLD` scheme in `main.c`: holding the primary button through boot for `BUTTON_DFU_HOLD_MS` (3 s) enters UF2 DFU, and a board defining it skips the normal momentary `BUTTON_DFU`/`BUTTON_FRESET` checks so that a short press stays with the application. No behavior change for any other board.
