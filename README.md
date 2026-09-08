@@ -111,8 +111,8 @@ When in OTA DFU mode, devices advertise using a board-specific name rather than 
 | RAK 4631                     | `4631_DFU`               |
 | RAK 3401                     | `3401_DFU`               |
 | RAK WisMesh Tag              | `RTAG_DFU`               |
-| Seeed SenseCAP Solar Node P1 | `SCAP_DFU`               |
 | Seeed MeshTracker X1         | `MTX1_DFU`               |
+| Seeed SenseCAP Solar Node P1 | `SCAP_DFU`               |
 | Seeed T1000e                 | `T1KE_DFU`               |
 | Seeed WioTracker L1          | `WTL1_DFU`               |
 | XIAO NRF52 BLE / SENSE       | `XIAO_DFU`               |
@@ -240,7 +240,9 @@ The X1 has a single user button, and its RESET line is not exposed as a second b
 
 Because a momentary press belongs to the application, a short press will *not* enter DFU — it has to be an uninterrupted hold through boot.
 
-To leave DFU mode, eject the mounted drive: the bootloader exits DFU and boots the application. There is no RESET button to fall back on, so this is the way out if you entered DFU and no longer want to copy firmware across. (Copying a `.uf2` across also reboots the board, as on any other board.)
+To leave DFU mode, eject the mounted drive: the bootloader exits DFU and boots the application. There is no RESET button to fall back on, so this is the way out if you entered DFU and no longer want to copy firmware across. (Copying a `.uf2` across also reboots the board, as on any other board.) It has to be a real eject — `eject`, `udisksctl power-off`, or Finder/Explorer "Safely Remove" — since the bootloader only sees an eject as a SCSI START STOP UNIT.
+
+Unplugging is not a way out. The board stays in the bootloader on battery, with no LED to show it, and boots the application when you next plug it in.
 
 ---
 

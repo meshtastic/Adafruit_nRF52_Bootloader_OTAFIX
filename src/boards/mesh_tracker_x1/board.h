@@ -30,12 +30,15 @@
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-/* The X1 carries an RGB LED, but it belongs to the application firmware and
- * the bootloader drives no status LED of its own, so LEDS_NUMBER is 0. The
- * pins are recorded for reference; wiring them up as this repo's RGB status
- * LED (LED_RGB_RED_PIN / _GREEN_PIN / _BLUE_PIN, which PWM-drive the DFU
- * state colours) needs the LED's polarity confirmed on real hardware
- * first. */
+/* The X1 carries an RGB LED, but LEDS_NUMBER is 0 and the bootloader drives no
+ * status LED of its own, so it shows nothing during DFU. Wiring the pins up as
+ * this repo's RGB status LED (LED_RGB_RED_PIN / _GREEN_PIN / _BLUE_PIN, which
+ * PWM-drive the DFU state colours) is a wanted follow-up, but not a one-line
+ * change: no board in the tree defines LED_RGB_RED_PIN today, so
+ * led_pwm_duty_cycle()'s output polarity is unexercised, and led_pwm_teardown()
+ * is gated on LEDS_NUMBER > 0 -- wiring the pins as-is would leave PWM0 owning
+ * P0.3/24/28 at app jump and kill the application's own LEDs. Polarity itself
+ * is not the blocker; firmware's variant.h gives LED_STATE_ON 1. */
 #define LEDS_NUMBER           0
 #define LED_RED_PIN           _PINNUM(0, 3)   // Red
 #define LED_GREEN_PIN         _PINNUM(0, 24)  // Green
@@ -48,11 +51,17 @@
 /* P0.18 is RESET and is not usable as a DFU button, so double-reset entry is
  * unavailable and the primary button is the only way into DFU. A momentary
  * press belongs to the application, so this board opts into the hold-to-enter
- * scheme instead (see BUTTON_DFU_HOLD in src/main.c). BUTTON_2 is declared
- * only to satisfy the BUTTONS_NUMBER >= 2 check in boards.h. */
+ * scheme instead (see BUTTON_DFU_HOLD in src/main.c).
+ *
+ * BUTTON_2 exists only to satisfy the BUTTONS_NUMBER >= 2 check in boards.h and
+ * aliases BUTTON_1, as wio_tracker_l1 and wismesh_tag do. Pointing it at P0.18
+ * would keep BUTTON_PULL's pulldown off nRESET, and since the pull is a
+ * pulldown, button_pressed() is active high and P0.18 sits high -- a FRESET read
+ * would be permanently true. Nothing reads FRESET on this board today (the
+ * BUTTON_DFU_HOLD branch compiles those reads out), so this is defensive. */
 #define BUTTONS_NUMBER        2
 #define BUTTON_1              _PINNUM(0, 6)  // Primary Button
-#define BUTTON_2              _PINNUM(0, 18) // unusable: RESET
+#define BUTTON_2              BUTTON_1       // no usable second button, P0.18 is RESET
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLDOWN
 
 // Hold the primary button through boot for this long to force UF2 DFU.

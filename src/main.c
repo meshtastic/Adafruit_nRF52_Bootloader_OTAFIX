@@ -111,6 +111,11 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 #define BUTTON_DFU_HOLD_POLL_MS         50
 #endif
 
+// How long the hold must last is a per-board decision, so there is no default.
+#if defined(BUTTON_DFU_HOLD) && !defined(BUTTON_DFU_HOLD_MS)
+#error "BUTTON_DFU_HOLD requires BUTTON_DFU_HOLD_MS (hold duration, ms) in board.h"
+#endif
+
 // Allow for using reset button essentially to swap between application and bootloader.
 // This is controlled by a flag in the app and is the behavior of CPX and all Arcade boards when using MakeCode.
 // DFU_DBL_RESET magic is used to determined which mode is entered
@@ -236,7 +241,15 @@ static void check_dfu_mode(void) {
   if (dfu_start || dfu_skip) NRF_POWER->GPREGRET = 0;
 
   // skip dfu entirely
+#if defined(BUTTON_DFU_HOLD)
+  // The application sets DFU_MAGIC_SKIP before System OFF, and waking from
+  // System OFF is a reset, so the first boot after a button power-off arrives
+  // here with dfu_skip set. Returning now would swallow that boot's hold, so
+  // fall through while the button is down and let the hold below decide.
+  if (dfu_skip && !button_pressed(BUTTON_DFU_HOLD)) return;
+#else
   if (dfu_skip) return;
+#endif
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
 #if defined(BUTTON_DFU_HOLD)
