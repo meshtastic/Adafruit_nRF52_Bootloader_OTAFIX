@@ -252,7 +252,7 @@ To leave DFU mode, eject the mounted drive: the bootloader exits DFU and boots t
 
 Unplugging is not a way out. The board stays in the bootloader on battery, with no LED on the X1 to show it, and plugging it back in only mounts the drive again. Eject the drive (or copy a `.uf2` across) to boot the application.
 
-Before OTAFIX 2.5 the T1000-E had no button path into DFU at all (the bootloader read the button with the wrong polarity), and an eject did not leave DFU. On those bootloaders, enter DFU from the application instead: `meshtastic --enter-dfu`, the 1200 bps serial touch, or the Meshtastic Android app; then install `update-t1000_e_bootloader-*.uf2` or `update-mesh_tracker_x1_bootloader-*.uf2` from the [releases](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/releases) to get the button.
+Before OTAFIX 2.5 the T1000-E had no button path into DFU at all (the bootloader read the button with the wrong polarity), and an eject did not leave DFU. On those bootloaders, enter UF2 mode from the application instead: `meshtastic --enter-dfu` or the Meshtastic Android app; then install `update-t1000_e_bootloader-*.uf2` or `update-mesh_tracker_x1_bootloader-*.uf2` from the [releases](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/releases) to get the button. Avoid the 1200 bps serial touch on these boards: it selects serial-only DFU (`DFU_MAGIC_SERIAL_ONLY_RESET`), which exposes no drive, has no eject to leave by, and the serial DFU protocol carries no reset request, so the only way out is completing a serial DFU with `adafruit-nrfutil`.
 
 ---
 
