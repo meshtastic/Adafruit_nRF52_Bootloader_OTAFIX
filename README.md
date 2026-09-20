@@ -250,7 +250,7 @@ Because a momentary press belongs to the application, a short press will *not* e
 
 To leave DFU mode, eject the mounted drive: the bootloader exits DFU and boots the application. There is no RESET button to fall back on, so this is the way out if you entered DFU and no longer want to copy firmware across. (Copying a `.uf2` across also reboots the board, as on any other board.) It has to be a real eject — `eject`, `udisksctl power-off`, or Finder/Explorer "Safely Remove" — since the bootloader only sees an eject as a SCSI START STOP UNIT.
 
-Unplugging is not a way out. The board stays in the bootloader on battery, with no LED on the X1 to show it, and boots the application when you next plug it in.
+Unplugging is not a way out. The board stays in the bootloader on battery, with no LED on the X1 to show it, and plugging it back in only mounts the drive again. Eject the drive (or copy a `.uf2` across) to boot the application.
 
 Before OTAFIX 2.5 the T1000-E had no button path into DFU at all (the bootloader read the button with the wrong polarity), and an eject did not leave DFU. On those bootloaders, enter DFU from the application instead: `meshtastic --enter-dfu`, the 1200 bps serial touch, or the Meshtastic Android app; then install `update-t1000_e_bootloader-*.uf2` or `update-mesh_tracker_x1_bootloader-*.uf2` from the [releases](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/releases) to get the button.
 
