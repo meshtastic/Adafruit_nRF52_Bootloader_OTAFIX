@@ -22,33 +22,43 @@
  * THE SOFTWARE.
  */
 
-#ifndef _T1000_E_H
-#define _T1000_E_H
+#ifndef _MESH_TRACKER_X1_H
+#define _MESH_TRACKER_X1_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(0, 24)  // Green
-#define LED_STATE_ON          0
+/* The X1 carries an RGB LED, but LEDS_NUMBER is 0 and the bootloader drives no
+ * status LED of its own, so it shows nothing during DFU. Wiring the pins up as
+ * this repo's RGB status LED (LED_RGB_RED_PIN / _GREEN_PIN / _BLUE_PIN, which
+ * PWM-drive the DFU state colours) is a wanted follow-up, but not a one-line
+ * change: no board in the tree defines LED_RGB_RED_PIN today, so
+ * led_pwm_duty_cycle()'s output polarity is unexercised, and led_pwm_teardown()
+ * is gated on LEDS_NUMBER > 0 -- wiring the pins as-is would leave PWM0 owning
+ * P0.3/24/28 at app jump and kill the application's own LEDs. Polarity itself
+ * is not the blocker; firmware's variant.h gives LED_STATE_ON 1. */
+#define LEDS_NUMBER           0
+#define LED_RED_PIN           _PINNUM(0, 3)   // Red
+#define LED_GREEN_PIN         _PINNUM(0, 24)  // Green
+#define LED_BLUE_PIN          _PINNUM(0, 28)  // Blue
+#define LED_STATE_ON          1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-/* P0.06 is active high with an internal pull-down. Firmware agrees:
- * variants/nrf52840/tracker-t1000-e/variant.h sets BUTTON_ACTIVE_LOW false and
- * BUTTON_SENSE_TYPE 0x5. The previous NRF_GPIO_PIN_PULLUP made button_pressed()
- * compare against an active_state of 0 on a pin that can only ever read 1, so
- * the button was never seen here at all.
+/* P0.18 is RESET and is not usable as a DFU button, so double-reset entry is
+ * unavailable and the primary button is the only way into DFU. A momentary
+ * press belongs to the application, so this board opts into the hold-to-enter
+ * scheme instead (see BUTTON_DFU_HOLD in src/main.c).
  *
- * P0.18 is RESET and is not exposed as a second button, so double-reset entry
- * is unavailable and the primary button is the only way in. A momentary press
- * belongs to the application, so this board uses the hold-to-enter scheme (see
- * BUTTON_DFU_HOLD in src/main.c), which also compiles out the BUTTON_FRESET
- * reads - P0.18 sits high and would otherwise read as permanently pressed.
- * BUTTON_2 is aliased only to satisfy the BUTTONS_NUMBER >= 2 check. */
+ * BUTTON_2 exists only to satisfy the BUTTONS_NUMBER >= 2 check in boards.h and
+ * aliases BUTTON_1, as wio_tracker_l1 and wismesh_tag do. Pointing it at P0.18
+ * would keep BUTTON_PULL's pulldown off nRESET, and since the pull is a
+ * pulldown, button_pressed() is active high and P0.18 sits high -- a FRESET read
+ * would be permanently true. Nothing reads FRESET on this board today (the
+ * BUTTON_DFU_HOLD branch compiles those reads out), so this is defensive. */
 #define BUTTONS_NUMBER        2
 #define BUTTON_1              _PINNUM(0, 6)  // Primary Button
 #define BUTTON_2              BUTTON_1       // no usable second button, P0.18 is RESET
@@ -63,17 +73,11 @@
  * drive therefore leaves DFU and boots the application. */
 #define UF2_EXIT_ON_EJECT
 
-/* P0.18 is RESET and is not exposed as a button, so there is no way to reset
- * out of UF2 mode once in it, and the host just re-mounts the drive if we stay
- * enumerated. Ejecting the drive therefore leaves DFU and boots the
- * application. */
-#define UF2_EXIT_ON_EJECT
-
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER   "Seeed Studio"
-#define BLEDIS_MODEL          "T1000-E"
+#define BLEDIS_MODEL          "MeshTracker-X1"
 
 //--------------------------------------------------------------------+
 // USB
@@ -85,10 +89,10 @@
 //--------------------------------------------------------------------+
 // UF2
 //--------------------------------------------------------------------+
-#define UF2_PRODUCT_NAME        "Seeed T1000-E for Meshtastic"
-#define UF2_VOLUME_LABEL        "T1000-E"
-#define UF2_BOARD_ID            "nRF52840-T1000-E-v1"
-#define UF2_INDEX_URL           "https://www.seeedstudio.com/SenseCAP-Card-Tracker-T1000-E-for-Meshtastic-p-5913.html"
+#define UF2_PRODUCT_NAME        "Seeed MeshTracker-X1 for Meshtastic"
+#define UF2_VOLUME_LABEL        "X1"
+#define UF2_BOARD_ID            "nRF52840-MeshTracker-X1"
+#define UF2_INDEX_URL           "https://wiki.seeedstudio.com/meshtracker_x1_node"
 
 
-#endif /* _T1000_E_H */
+#endif /* _MESH_TRACKER_X1_H */

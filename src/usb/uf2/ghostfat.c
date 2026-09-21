@@ -124,11 +124,17 @@ STATIC_ASSERT(FAT_ENTRIES_PER_SECTOR                       ==       256); // FAT
 #define STR0(x) #x
 #define STR(x) STR0(x)
 
-char infoUf2File[128*3] =
-    "UF2 Bootloader " UF2_VERSION "\r\n"
-    "Model: " UF2_PRODUCT_NAME "\r\n"
-    "Board-ID: " UF2_BOARD_ID "\r\n"
-    "Date: " __DATE__ "\r\n";
+#define INFO_UF2_TEXT \
+    "UF2 Bootloader " UF2_VERSION "\r\n" \
+    "Model: " UF2_PRODUCT_NAME "\r\n" \
+    "Board-ID: " UF2_BOARD_ID "\r\n" \
+    "Date: " __DATE__ "\r\n" \
+    "Factory-Erase: UF2 family 0x4D455348\r\n"
+
+char infoUf2File[128*3] = INFO_UF2_TEXT;
+// uf2_init() appends "SoftDevice: S140 7.3.0\r\n" at runtime; 40 covers the
+// widest values the id/version fields can print
+STATIC_ASSERT(sizeof(INFO_UF2_TEXT) + 40 <= sizeof(infoUf2File));
 
 const char indexFile[] =
     "<!doctype html>\n"
@@ -619,6 +625,13 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
         state->aborted = true;
         return -1;
       }
+    break;
+
+    case CFG_UF2_MESHTASTIC_ERASE_ID:
+      // Factory erase request: nothing to flash. The erase itself runs from
+      // msc_uf2.c once the host has acknowledged the write.
+      PRINTF("Factory erase requested\r\n");
+      state->factory_erase = true;
     break;
 
     // unknown family ID

@@ -14,7 +14,7 @@ Canonical guidance for AI coding agents and maintainers working in this repo.
 2. The rest of `README.md` — boards supported, installation, the Meshtastic
    Android in-app upgrade flow, troubleshooting.
 3. `CONTRIBUTING.md` — dev setup, PR process, adding a new board.
-4. `changelog.md` — OTAFIX version history (2.1–2.3 at the top; everything
+4. `changelog.md` — OTAFIX version history (2.1–2.5 at the top; everything
    below predates the OTAFIX fork).
 5. The design invariants and gotchas below — do not violate them.
 
@@ -67,8 +67,8 @@ Each board directory can carry:
   `src/screen.c`.
 - `board.mk` — Makefile board config (`MCU_SUB_VARIANT`, per-board
   `CFLAGS` like the BLE `DEVICE_NAME`).
-- `board.cmake` — **only exists for 4 of 17 boards** (`heltec_t096`,
-  `heltec_t1`, `heltec_t114`, `thinknode_m1`). `cmake -DBOARD=<anything
+- `board.cmake` — **only exists for 5 of 19 boards** (`heltec_t096`,
+  `heltec_t1`, `heltec_t114`, `mesh_tracker_x1`, `thinknode_m1`). `cmake -DBOARD=<anything
   else>` fails outright. Nobody
   uses the CMake path in practice (CI and `tools/build_all.py` both use
   `make`); don't assume feature parity between the two build systems.
@@ -81,11 +81,23 @@ keep in sync in either build system (unlike the CI matrix, see below).
 ### Core bootloader (`src/`)
 
 `main.c` is the entry point (MBR/SoftDevice handoff, DFU state machine
-dispatch). `screen.c`/`images.c` render the OLED UF2/BLE-OTA screens, active
+dispatch). `dfu_magic.h` holds the `NRF_POWER->GPREGRET` magics an
+application (or the bootloader itself) writes to pick the next boot mode. `screen.c`/`images.c` render the OLED UF2/BLE-OTA screens, active
 only when the board defines `DISPLAY_PIN_SCK` — today that's `heltec_t096`,
 `heltec_t1`, and `heltec_t114`. `dfu_ble_svc.c`/`dfu_init.c` are the BLE DFU
 service; `flash_nrf5x.c` wraps flash writes. `usb/` is the USB MSC (UF2
-drive) + CDC stack on top of the vendored `lib/tinyusb`. `cmsis/` is ARM
+drive) + CDC stack on top of the vendored `lib/tinyusb`. A UF2 block with
+family `CFG_UF2_MESHTASTIC_ERASE_ID` (`usb/uf2/uf2cfg.h`) is a factory-erase
+request: `ghostfat.c` flags it, `msc_uf2.c` erases the whole App Data reservation
+(`USER_FLASH_END`..`BOOTLOADER_REGION_START`) once the host has acked the
+write, then arms a 500 ms `app_timer` (or an eject from the host) to leave
+the DFU loop so `check_dfu_mode()` can tear USB down before it resets into
+UF2 mode — resetting inside the MSC callback would drop the host's trailing
+FAT writes. The reservation holds two things on
+nRF52840 — LittleFS in the top 7 pages and firmware's `WarmNodeStore`
+node-DB ring in the 3 below it at `0xEA000` — so the loop must cover the
+bootloader's bound, never just the filesystem. `tools/make_factory_erase_uf2.py` emits the
+board-agnostic file, checked in as `tools/meshtastic_factory_erase.uf2`. `cmsis/` is ARM
 CMSIS headers.
 
 ### Vendored submodules (`lib/`)
@@ -102,8 +114,10 @@ Renovate will keep proposing. nrfx 4.0 restructured the entire repo layout
 repo's Makefile `IPATH`s and every board's linker script reworked, not just
 a digest bump. v3.14.0 is the last tag on the pre-4.0 layout, so it's the
 practical ceiling for a same-day bump; going past it is a real project, not
-a Renovate merge. If a future Renovate PR targets nrfx ≥4.0, that's this
-gotcha firing — don't merge it without doing that rework.
+a Renovate merge. `renovate.json` disables `lib/nrfx` updates for exactly this
+reason, so no nrfx bump PR should appear at all; if one does, that rule has
+broken and the PR still must not be merged without the rework. Drop the rule
+when the rework lands. `lib/tinyusb` and `lib/uf2` are unaffected.
 
 `lib/tinyusb`'s `nrf5x` USB port (`dcd_nrf5x.c`) calls nrfx's chip-specific
 errata functions (e.g. `nrf52_errata_199()`) — bumping tinyusb alone,
@@ -119,12 +133,15 @@ submodule) — `SD_NAME`/`SD_VERSION` in `Makefile` select which one.
 ### CI (`.github/workflows/githubci.yml`)
 
 A `set-matrix` job lists `src/boards/*/` and fans out a `build` job per
-board (currently 17), on every PR and on `release: created`. Release events
-additionally upload `.zip`/`.hex`/`update-*.uf2` per board as release
-assets; PR runs just validate the compile and get 1-day artifact retention
-(release runs keep 90).
+board (currently 19), on every PR and on `release: created`. On release
+events a single `release` job downloads every board's artifacts and uploads
+`.zip`/`.hex`/`update-*.uf2` per board plus `tools/meshtastic_factory_erase.uf2`
+as release assets; PR runs just validate the compile and get 1-day artifact
+retention (release runs keep 90). Only `release` holds `contents: write` —
+every job that runs repo code (`make`, `tools/`) is read-only with
+`persist-credentials: false`, so a PR cannot borrow a write token.
 
-Branch protection on `master` requires all 18 checks (`set-matrix` + 17
+Branch protection on `master` requires all 20 checks (`set-matrix` + 19
 `build (<board>)` contexts) by literal name. **Adding, removing, or renaming
 a board changes those context names** — branch protection does not update
 itself; a human has to edit it too.

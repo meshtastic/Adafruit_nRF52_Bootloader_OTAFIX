@@ -375,7 +375,7 @@ INC_PATHS = $(addprefix -I,$(IPATH))
 # BUILD TARGETS
 #------------------------------------------------------------------------------
 
-.PHONY: all clean flash flash-dfu flash-sd flash-mbr dfu-flash sd mbr gdbflash gdb
+.PHONY: all clean flash flash-dfu flash-sd flash-mbr dfu-flash sd mbr gdbflash gdb factory-erase-uf2
 
 # default target to build
 all: $(BUILD)/$(OUT_NAME).out $(BUILD)/$(OUT_NAME)_nosd.hex $(BUILD)/update-$(OUT_NAME)_nosd.uf2 $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).zip
@@ -400,17 +400,20 @@ linkermap: $(BUILD)/$(OUT_NAME).out
 	@linkermap -v $<.map
 
 # Create objects from C SRC files
-$(BUILD)/%.o: %.c
+# $(BUILD) is order-only: it must exist before any object is written, but its
+# mtime changes as objects land in it, so a normal prerequisite would relink
+# and rebuild spuriously.
+$(BUILD)/%.o: %.c | $(BUILD)
 	@echo CC $(notdir $<)
 	@$(CC) $(CFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Assemble files
-$(BUILD)/%.o: %.S
+$(BUILD)/%.o: %.S | $(BUILD)
 	@echo AS $(notdir $<)
 	@$(CC) -x assembler-with-cpp $(ASFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Link
-$(BUILD)/$(OUT_NAME).out: $(BUILD) $(OBJECTS)
+$(BUILD)/$(OUT_NAME).out: $(OBJECTS) | $(BUILD)
 	@echo LD $(notdir $@)
 	@$(CC) -o $@ $(LDFLAGS) $(OBJECTS) -Wl,--start-group $(LIBS) -Wl,--end-group
 	@$(SIZE) $@
@@ -444,6 +447,10 @@ $(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_NAME).hex
 #-------------- Artifacts --------------
 $(BIN):
 	@$(MKDIR) -p $@
+
+# Board-agnostic factory-erase request file (see tools/make_factory_erase_uf2.py)
+factory-erase-uf2:
+	@python3 tools/make_factory_erase_uf2.py
 
 copy-artifact: $(BIN)
 	@$(CP) $(BUILD)/update-$(OUT_NAME)_nosd.uf2 $(BIN)

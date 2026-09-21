@@ -48,6 +48,7 @@
 #include "dfu_transport.h"
 #include "bootloader.h"
 #include "bootloader_util.h"
+#include "dfu_magic.h"
 
 #include "nrf.h"
 #include "nrf_soc.h"
@@ -75,6 +76,7 @@
 
 void usb_init(bool cdc_only);
 void usb_teardown(void);
+bool msc_factory_erase_pending(void);
 
 // tinyusb function that handles power event (detected, ready, removed)
 // We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled.
@@ -83,6 +85,7 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 #else
 #define usb_init(x)       led_state(STATE_USB_MOUNTED) // mark nrf52832 as mounted
 #define usb_teardown()
+#define msc_factory_erase_pending() false
 
 #endif
 
@@ -95,23 +98,6 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
  * - Fatal Error    : LED Status & Conn blink one after another
  */
 
-/* Magic that written to NRF_POWER->GPREGRET by application when it wish to go into DFU
- * - DFU_MAGIC_OTA_APPJUM        : used by BLEDfu service, SD is already inited
- * - DFU_MAGIC_OTA_RESET         : entered by soft reset, SD is not inited yet
- * - DFU_MAGIC_SERIAL_ONLY_RESET : with CDC interface only
- * - DFU_MAGIC_UF2_RESET         : with CDC and MSC interfaces
- * - DFU_MAGIC_SKIP              : skip DFU entirely including double reset delay,
- *                                 Can be used with systemoff or quick reset to app
- *
- * Note: for DFU_MAGIC_OTA_APPJUM Softdevice must not initialized.
- * since it is already in application. In all other case of OTA SD must be initialized
- */
-#define DFU_MAGIC_OTA_APPJUM            BOOTLOADER_DFU_START  // 0xB1
-#define DFU_MAGIC_OTA_RESET             0xA8
-#define DFU_MAGIC_SERIAL_ONLY_RESET     0x4e
-#define DFU_MAGIC_UF2_RESET             0x57
-#define DFU_MAGIC_SKIP                  0x6d
-
 #define DFU_DBL_RESET_MAGIC             0x5A1AD5      // SALADS
 #define DFU_DBL_RESET_APP               0x4ee5677e
 #define DFU_DBL_RESET_DELAY             500
@@ -119,6 +105,16 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 
 #define BOOTLOADER_VERSION_REGISTER     NRF_TIMER2->CC[0]
 #define DFU_SERIAL_STARTUP_INTERVAL     1000
+
+// Poll interval for boards using the BUTTON_DFU_HOLD hold-to-enter-DFU scheme.
+#ifndef BUTTON_DFU_HOLD_POLL_MS
+#define BUTTON_DFU_HOLD_POLL_MS         50
+#endif
+
+// How long the hold must last is a per-board decision, so there is no default.
+#if defined(BUTTON_DFU_HOLD) && !defined(BUTTON_DFU_HOLD_MS)
+#error "BUTTON_DFU_HOLD requires BUTTON_DFU_HOLD_MS (hold duration, ms) in board.h"
+#endif
 
 // Allow for using reset button essentially to swap between application and bootloader.
 // This is controlled by a flag in the app and is the behavior of CPX and all Arcade boards when using MakeCode.
@@ -216,7 +212,7 @@ int main(void) {
     bootloader_app_start();
   }
 
-  NRF_POWER->GPREGRET = 0xA8; // No application was loaded, reset the system with the OTA DFU update
+  NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET; // No application was loaded, reset the system with the OTA DFU update
   NVIC_SystemReset();
 }
 
@@ -231,7 +227,7 @@ static void check_dfu_mode(void) {
 
   // Serial only mode
   bool const serial_only_dfu = (gpregret == DFU_MAGIC_SERIAL_ONLY_RESET);
-  bool const uf2_dfu         = (gpregret == DFU_MAGIC_UF2_RESET);
+  bool       uf2_dfu         = (gpregret == DFU_MAGIC_UF2_RESET);
   bool const dfu_skip        = (gpregret == DFU_MAGIC_SKIP);
 
   bool const reason_reset_pin = (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk) ? true : false;
@@ -245,14 +241,44 @@ static void check_dfu_mode(void) {
   if (dfu_start || dfu_skip) NRF_POWER->GPREGRET = 0;
 
   // skip dfu entirely
+#if defined(BUTTON_DFU_HOLD)
+  // The application sets DFU_MAGIC_SKIP before System OFF, and waking from
+  // System OFF is a reset, so the first boot after a button power-off arrives
+  // here with dfu_skip set. Returning now would swallow that boot's hold, so
+  // fall through while the button is down and let the hold below decide.
+  if (dfu_skip && !button_pressed(BUTTON_DFU_HOLD)) return;
+#else
   if (dfu_skip) return;
+#endif
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
+#if defined(BUTTON_DFU_HOLD)
+  // Boards that expose no usable second button (RESET is wired to the MCU
+  // RESET pin, so double-reset entry is unavailable) reach DFU by holding the
+  // primary button through boot instead. A momentary press belongs to the
+  // application, so the plain BUTTON_DFU / BUTTON_FRESET checks below are
+  // skipped: only an uninterrupted hold of BUTTON_DFU_HOLD_MS enters DFU, and
+  // it selects UF2 rather than the OTA default so the mass-storage drive comes
+  // up. Releasing the button early boots the application as normal.
+  if (!dfu_start) {
+    uint32_t held_ms = 0;
+    while (button_pressed(BUTTON_DFU_HOLD)) {
+      if (held_ms >= BUTTON_DFU_HOLD_MS) {
+        dfu_start = true;
+        uf2_dfu   = true;
+        break;
+      }
+      NRFX_DELAY_MS(BUTTON_DFU_HOLD_POLL_MS);
+      held_ms += BUTTON_DFU_HOLD_POLL_MS;
+    }
+  }
+#else
   // DFU button pressed
   dfu_start = dfu_start || button_pressed(BUTTON_DFU);
 
   // DFU + FRESET are pressed --> OTA
   _ota_dfu = _ota_dfu || (button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET));
+#endif
 
   bool const valid_app = bootloader_app_is_valid();
   bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
@@ -321,6 +347,13 @@ static void check_dfu_mode(void) {
       usb_teardown(); // allow booting to app after ota even if usb is connected
     } else {
       usb_teardown();
+
+      // Factory erase done (msc_uf2.c): USB is detached cleanly, now come
+      // back as a UF2 drive for the firmware install.
+      if (msc_factory_erase_pending()) {
+        NRF_POWER->GPREGRET = DFU_MAGIC_UF2_RESET;
+        NVIC_SystemReset();
+      }
     }
   }
 }

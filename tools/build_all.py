@@ -8,6 +8,11 @@ from multiprocessing import Pool
 SUCCEEDED = "\033[32msucceeded\033[0m"
 FAILED = "\033[31mfailed\033[0m"
 
+# Match the Makefile's toolchain selection (CROSS_COMPILE ?= arm-none-eabi-).
+# A bare "size" picks up the host's, which on macOS is Apple's and cannot read
+# an ARM ELF at all.
+CROSS_COMPILE = os.environ.get("CROSS_COMPILE", "arm-none-eabi-")
+
 build_format = '| {:32} | {:18} | {:5} | {:6} | {:6} |'
 build_separator = '-' * 74
 
@@ -25,8 +30,8 @@ def build_board(board):
     if make_result.returncode == 0:
         succeeded = 1
         out_file = glob.glob('_build/build-{}/*.out'.format(board))[0]
-        size_output = subprocess.run('size {}'.format(out_file), shell=True, stdout=subprocess.PIPE).stdout.decode(
-            "utf-8")
+        size_output = subprocess.run('{}size {}'.format(CROSS_COMPILE, out_file), shell=True,
+                                     stdout=subprocess.PIPE).stdout.decode("utf-8")
         size_list = size_output.split('\n')[1].split('\t')
         flash_size = int(size_list[0])
         sram_size = int(size_list[1]) + int(size_list[2])

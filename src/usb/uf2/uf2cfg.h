@@ -7,6 +7,12 @@
 // Family ID for updating Bootloader
 #define CFG_UF2_FAMILY_BOOT_ID        0xd663823c
 
+// Meshtastic factory-erase request ("MESH"). A UF2 carrying this family ID is
+// not flashed: the bootloader erases its own App Data reservation (the
+// application's LittleFS) and reboots into UF2 mode. Board-agnostic, so one
+// file serves every board here. Unknown to older bootloaders, which ignore it.
+#define CFG_UF2_MESHTASTIC_ERASE_ID   0x4D455348
+
 // Board-specific ID for board-specific Application
 #if defined(USB_DESC_VID) && defined(USB_DESC_UF2_PID) && USB_DESC_VID && USB_DESC_UF2_PID
     #define CFG_UF2_BOARD_APP_ID      ((USB_DESC_VID << 16) | USB_DESC_UF2_PID)

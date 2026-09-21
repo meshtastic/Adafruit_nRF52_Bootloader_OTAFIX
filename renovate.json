@@ -15,5 +15,13 @@
   "git-submodules": {
     "enabled": true
   },
+  "packageRules": [
+    {
+      "description": "lib/nrfx is pinned to v3.14.0, the last tag on the pre-4.0 repo layout. nrfx 4.0 moved mdk/ under bsp/, which breaks every Makefile IPATH and board linker script here, so any digest bump past 3.14.0 fails all board builds. Moving to 4.x is a rework, not a digest bump. Remove this rule when that rework lands. See AGENTS.md, Vendored submodules (lib/).",
+      "matchManagers": ["git-submodules"],
+      "matchDepNames": ["lib/nrfx"],
+      "enabled": false
+    }
+  ],
   "labels": ["dependencies"]
 }
