@@ -62,7 +62,7 @@
 
 // The slots are fed from the switchable 3V3_S rail (WB_IO2), which is off
 // out of reset - the bootloader has to raise it before the panel answers.
-#define DISPLAY_VSENSOR_PIN   _PINNUM(0, 34)
+#define DISPLAY_VSENSOR_PIN   _PINNUM(1, 2)
 #define DISPLAY_VSENSOR_ON    1
 
 #define DISPLAY_WIDTH         128

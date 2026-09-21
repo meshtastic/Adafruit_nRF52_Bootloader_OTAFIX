@@ -61,7 +61,7 @@
 #define DISPLAY_PIN_SCL       _PINNUM(0, 14)
 
 // Switchable 3V3_S rail (WB_IO2), off out of reset.
-#define DISPLAY_VSENSOR_PIN   _PINNUM(0, 34)
+#define DISPLAY_VSENSOR_PIN   _PINNUM(1, 2)
 #define DISPLAY_VSENSOR_ON    1
 
 #define DISPLAY_WIDTH         128
