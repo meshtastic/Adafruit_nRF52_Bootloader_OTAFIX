@@ -1,6 +1,6 @@
 #include "boards.h"
 
-#if defined(DISPLAY_PIN_SCK)
+#ifdef BOARD_HAS_DISPLAY
 
 #include <stdint.h>
 
