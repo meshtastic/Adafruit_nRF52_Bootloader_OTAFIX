@@ -122,9 +122,8 @@ when the rework lands. `lib/tinyusb` and `lib/uf2` are unaffected.
 `lib/tinyusb`'s `nrf5x` USB port (`dcd_nrf5x.c`) calls nrfx's chip-specific
 errata functions (e.g. `nrf52_errata_199()`) — bumping tinyusb alone,
 without nrfx at a version new enough to define them, fails to compile. The
-two submodules move together, not independently, which is why Renovate's
-separate per-submodule PRs (#11, #12 as originally filed) each failed CI on
-their own; see the `linker/nrf_common.ld` gotcha below for the other half of
+two submodules move together, not independently, and a Renovate PR that
+bumps either one alone fails CI; see the `linker/nrf_common.ld` gotcha below for the other half of
 what that joint bump needed.
 
 `lib/softdevice/` vendors Nordic's SoftDevice binaries directly (not a
@@ -150,12 +149,10 @@ itself; a human has to edit it too.
 
 - **ARM GCC version matters.** CI pins exactly `12.3.Rel1`; 13.3.Rel1 also
   compiles clean and is the closest verified-working version if you can't
-  get the exact CI-pinned one. GCC 15 used to fail with
-  `-Werror=array-bounds` in
+  get the exact CI-pinned one. GCC 15 is unverified here; Adafruit's scoped
+  `#pragma GCC diagnostic` for its `-Werror=array-bounds` false positive in
   `lib/sdk11/components/libraries/bootloader_dfu/bootloader_settings.c`
-  (a false positive on a fixed MBR-address read); Adafruit's fix (a scoped
-  `#pragma GCC diagnostic`, backported in #26) is in, but nobody has rebuilt
-  here with GCC 15 since — if you do, update this note.
+  (a fixed MBR-address read) is in.
 - **MeshCore/Ripple content has been deliberately removed** from the docs
   (README, changelog) — this is Meshtastic's own branded fork now, not a
   place to re-add other companion-firmware documentation. If you're
@@ -184,21 +181,17 @@ itself; a human has to edit it too.
   upgrade support with no board here yet (issues #4, #5) — bringing up a
   new board needs real hardware to get `UF2_BOARD_ID`/VID-PID/pin defs
   right; don't fabricate a `board.h` without one.
-- **`CURRENT.UF2` dump-and-restore used to hang the device — fixed in #20,
-  don't reintroduce it.** Root cause: `CURRENT.UF2` was sized off the max
-  possible app region (`TRUE_USER_FLASH_SIZE`) instead of the real
-  installed app, AND `msc_uf2.c`'s UF2-app-flash completion path never
-  recorded the real app size into `bootloader_settings.bank_0_size` (stayed
-  0 from a `memset`, only the DFU-serial protocol populated it). Together
-  that meant restoring a `CURRENT.UF2` dump byte-for-byte could still hang
-  the device on boot. Both fixed together in #20 (`ghostfat.c`'s
-  `current_flash_size()` + `msc_uf2.c`'s `update_status.app_size`) —
-  verified on real RAK4631 hardware, the same dump-and-restore sequence
-  that hung now completes in ~2 seconds. If you change either of those two
-  files, check this still holds.
+- **A `CURRENT.UF2` dump restored byte-for-byte must boot.** Two things
+  hold it: `CURRENT.UF2` is sized off the installed app (`ghostfat.c`'s
+  `current_flash_size()`), falling back to the max app region
+  (`TRUE_USER_FLASH_SIZE`) only when `bank_0_size` is zero, erased or
+  oversized, as after a debug-probe flash, and the UF2 flash completion path records the real app size into
+  `bootloader_settings.bank_0_size` (`msc_uf2.c`'s `update_status.app_size`);
+  otherwise only serial DFU sets it. Lose either and the restored device hangs
+  on boot. If you change either file, re-run dump-and-restore on hardware.
 - **Flashing the bootloader+SoftDevice package over serial DFU zeros
   `bank_0` — the device then boots into BLE-OTA wait mode, not the app,
-  on its own.** Confirmed on real RAK4631 hardware (2026-08-19): after
+  on its own.** After
   `adafruit-nrfutil dfu serial --package <board>_bootloader-..._s140_...zip`
   reports "Device programmed", the board goes USB-silent (no serial port,
   no UF2 drive) because `bank_0_size` is now 0 and this bootloader's
