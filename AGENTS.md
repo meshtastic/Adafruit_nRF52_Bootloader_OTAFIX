@@ -183,8 +183,9 @@ itself; a human has to edit it too.
   right; don't fabricate a `board.h` without one.
 - **A `CURRENT.UF2` dump restored byte-for-byte must boot.** Two things
   hold it: `CURRENT.UF2` is sized off the installed app (`ghostfat.c`'s
-  `current_flash_size()`), not the max app region (`TRUE_USER_FLASH_SIZE`),
-  and the UF2 flash completion path records the real app size into
+  `current_flash_size()`), falling back to the max app region
+  (`TRUE_USER_FLASH_SIZE`) only when `bank_0_size` is zero, erased or
+  oversized, as after a debug-probe flash, and the UF2 flash completion path records the real app size into
   `bootloader_settings.bank_0_size` (`msc_uf2.c`'s `update_status.app_size`);
   otherwise only serial DFU sets it. Lose either and the restored device hangs
   on boot. If you change either file, re-run dump-and-restore on hardware.
