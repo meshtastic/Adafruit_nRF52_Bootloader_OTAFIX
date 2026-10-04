@@ -24,7 +24,58 @@
 
 #include "boards.h"
 
-#if defined(DISPLAY_PIN_SCK)
+#ifdef BOARD_HAS_DISPLAY
+
+// Defaults for 1bpp mono panels. The stock geometry below is sized for a
+// 240x135 TFT and does not fit a typical 128x64 OLED, so give mono boards a
+// four-line layout (title / mode / version / banner) out of the box. A board
+// only has to declare its bus and title; anything here can still be
+// overridden per board.
+#ifdef DISPLAY_MONO
+#if DISPLAY_HEIGHT < 96
+// Three 32x32 icons need 96x32; that plus four text lines does not fit.
+#define DISPLAY_NO_DRAG_ICONS
+#define NOLABELS
+#endif
+
+#ifndef FONT_SIZE_LARGE
+#define FONT_SIZE_LARGE      2
+#endif
+#ifndef BANNER_TEXT
+#define BANNER_TEXT          "meshtastic.org"
+#endif
+
+// The colour bars are dark in mono, so bar 1 simply spans the panel and the
+// other two collapse; this also keeps drawBar inside the frame buffer.
+#ifndef SCREEN_BAR1_Y
+#define SCREEN_BAR1_Y        0
+#endif
+#ifndef SCREEN_BAR1_H
+#define SCREEN_BAR1_H        DISPLAY_HEIGHT
+#endif
+#ifndef SCREEN_BAR2_H
+#define SCREEN_BAR2_H        0
+#endif
+#ifndef SCREEN_BAR3_H
+#define SCREEN_BAR3_H        0
+#endif
+
+#ifndef DISPLAY_TITLE_Y
+#define DISPLAY_TITLE_Y      0
+#endif
+#ifndef DRAG_TEXT_Y
+#define DRAG_TEXT_Y          22
+#endif
+#ifndef BLE_OTA_Y
+#define BLE_OTA_Y            22
+#endif
+#ifndef UF2_VERSION_BASE_Y
+#define UF2_VERSION_BASE_Y   44
+#endif
+#ifndef BANNER_TEXT_Y
+#define BANNER_TEXT_Y        55
+#endif
+#endif // DISPLAY_MONO
 
 #ifndef BANNER_TEXT
 #define BANNER_TEXT "meshtastic.org - OTAFIX by oltaco"
@@ -121,6 +172,13 @@ const uint16_t palette[] = {
 #ifndef BLE_OTA_Y
 #define BLE_OTA_Y            65
 #endif
+// Mode line on the drag screen, for panels too short for the 32px icon row.
+#ifndef DRAG_TEXT_Y
+#define DRAG_TEXT_Y          BLE_OTA_Y
+#endif
+#ifndef DRAG_TEXT
+#define DRAG_TEXT            "USB UF2"
+#endif
 #ifndef FONT_SIZE_LARGE
 #define FONT_SIZE_LARGE      4
 #endif
@@ -129,6 +187,11 @@ const uint16_t palette[] = {
 // TODO only buffer partial screen to save SRAM
 // ESP32s2 can only statically allocated DRAM up to 160KB.
 // the remaining 160KB can only be allocated at runtime as heap.
+#ifdef DISPLAY_MONO
+_Static_assert(DISPLAY_HEIGHT % 8 == 0,
+               "mono panels are addressed in 8-row pages; DISPLAY_HEIGHT must be a multiple of 8");
+#endif
+
 static uint8_t frame_buf[DISPLAY_WIDTH * DISPLAY_HEIGHT];
 //static uint8_t* frame_buf;
 
@@ -155,11 +218,18 @@ static void printch(int x, int y, int color, const uint8_t* fnt, int size) {
   }
 }
 
+#ifndef DISPLAY_NO_DRAG_ICONS
 // print icon
 static void printicon(int x, int y, int color, const uint8_t* icon) {
   int w = *icon++;
   int h = *icon++;
   int sz = *icon++;
+
+  // The decode loop below writes w*h bytes straight into frame_buf with no
+  // clipping of its own, so anything that would land outside is dropped.
+  if (x < 0 || y < 0 || x + w > DISPLAY_WIDTH || y + h > DISPLAY_HEIGHT) {
+    return;
+  }
 
   uint8_t mask = 0x80;
   int runlen = 0;
@@ -201,6 +271,7 @@ static void printicon(int x, int y, int color, const uint8_t* icon) {
     }
   }
 }
+#endif // DISPLAY_NO_DRAG_ICONS
 
 static void print(int x, int y, int color, const char* text, int size) {
   // Glyphs are written straight into frame_buf with no bounds check of
@@ -231,6 +302,39 @@ static inline void print_centered(int y, int color, const char* text, int size) 
 //
 //--------------------------------------------------------------------+
 
+#ifdef DISPLAY_MONO
+
+// One bit per pixel, so the 16-entry palette collapses to "lights a pixel or
+// does not". The layout above only ever draws foreground in white (text,
+// icons) and purple (the version string); the three background bars use
+// colours that stay dark. That is what lets the colour layout survive the
+// conversion without being redrawn for mono.
+#define MONO_LIT_MASK   ((1u << COLOR_WHITE) | (1u << COLOR_PURPLE))
+
+static void draw_screen(uint8_t const* fb) {
+  // SSD1306/SH1106 GDDRAM is paged: one byte spans 8 rows of a single
+  // column, LSB topmost. frame_buf is already column-major, so each output
+  // byte gathers 8 contiguous bytes of it.
+  for (int page = 0; page < DISPLAY_HEIGHT / 8; ++page) {
+    uint8_t line[DISPLAY_WIDTH];
+
+    for (int x = 0; x < DISPLAY_WIDTH; ++x) {
+      uint8_t const* col = fb + x * DISPLAY_HEIGHT + page * 8;
+      uint8_t bits = 0;
+      for (int bit = 0; bit < 8; ++bit) {
+        if (MONO_LIT_MASK & (1u << (col[bit] & 0xf))) {
+          bits |= (uint8_t) (1u << bit);
+        }
+      }
+      line[x] = bits;
+    }
+
+    board_display_draw_page((uint8_t) page, line, sizeof(line));
+  }
+}
+
+#else
+
 static void draw_screen(uint8_t const* fb) {
   uint8_t const* p = fb;
   for (int y = 0; y < DISPLAY_WIDTH; ++y) {
@@ -246,8 +350,23 @@ static void draw_screen(uint8_t const* fb) {
   }
 }
 
+#endif
+
 // draw color bar
 static void drawBar(int y, int h, int color) {
+  // Clamp to the panel: the default bar geometry is sized for a 240x135
+  // screen and would run off the end of a column on a shorter one.
+  if (y < 0) {
+    h += y;
+    y = 0;
+  }
+  if (y >= DISPLAY_HEIGHT || h <= 0) {
+    return;
+  }
+  if (y + h > DISPLAY_HEIGHT) {
+    h = DISPLAY_HEIGHT - y;
+  }
+
   for (int x = 0; x < DISPLAY_WIDTH; ++x) {
     memset(frame_buf + x * DISPLAY_HEIGHT + y, color, h);
   }
@@ -264,6 +383,12 @@ void screen_draw_drag(void) {
   print_centered(UF2_VERSION_BASE_Y, COLOR_PURPLE, UF2_VERSION_BASE, 1);
   print_centered(BANNER_TEXT_Y, COLOR_WHITE, BANNER_TEXT, 1);
 
+#ifdef DISPLAY_NO_DRAG_ICONS
+  // The icon row is three 32x32 glyphs, 96px wide and 32px tall before any
+  // spacing. A 128x64 panel cannot carry that and the four text lines, so
+  // name the mode instead.
+  print_centered(DRAG_TEXT_Y, COLOR_WHITE, DRAG_TEXT, FONT_SIZE_LARGE);
+#else
 #ifndef DRAG
 #define DRAG 70
 #endif
@@ -277,6 +402,7 @@ void screen_draw_drag(void) {
   print(22, DRAG - 12, COLOR_WHITE, "firmware.uf2", 1);
   print(160, DRAG - 12, COLOR_WHITE, UF2_VOLUME_LABEL, 1);
   #endif // NOLABELS
+#endif // DISPLAY_NO_DRAG_ICONS
 
   draw_screen(frame_buf);
 }

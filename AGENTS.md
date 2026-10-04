@@ -60,8 +60,9 @@ No lint, no test suite — this is a bootloader; the only correctness signal is
 ### Board abstraction: `src/boards/<board>/`
 
 Each board directory can carry:
-- `board.h` — pin/peripheral defines (`DISPLAY_PIN_SCK` gates the OLED code
-  in `src/screen.c` and `src/images.c`; `BLEDIS_MANUFACTURER`/`BLEDIS_MODEL`
+- `board.h` — pin/peripheral defines (`DISPLAY_PIN_SCK` or `DISPLAY_PIN_SDA`
+  gates the display code in `src/screen.c` and `src/images.c`, through the
+  `BOARD_HAS_DISPLAY` those two set; `BLEDIS_MANUFACTURER`/`BLEDIS_MODEL`
   are the real vendor name, e.g. RAKWireless — don't rebrand these).
   Defining `BANNER_TEXT` overrides the on-screen DFU banner default in
   `src/screen.c`.
@@ -82,9 +83,13 @@ keep in sync in either build system (unlike the CI matrix, see below).
 
 `main.c` is the entry point (MBR/SoftDevice handoff, DFU state machine
 dispatch). `dfu_magic.h` holds the `NRF_POWER->GPREGRET` magics an
-application (or the bootloader itself) writes to pick the next boot mode. `screen.c`/`images.c` render the OLED UF2/BLE-OTA screens, active
-only when the board defines `DISPLAY_PIN_SCK` — today that's `heltec_t096`,
-`heltec_t1`, and `heltec_t114`. `dfu_ble_svc.c`/`dfu_init.c` are the BLE DFU
+application (or the bootloader itself) writes to pick the next boot mode. `screen.c`/`images.c` render the DFU UF2/BLE-OTA screens, active
+only when the board names a display bus: `DISPLAY_PIN_SCK` for an SPI TFT
+(`heltec_t096`, `heltec_t1`, `heltec_t114`) or `DISPLAY_PIN_SDA` for an I2C
+mono OLED (`wiscore_rak4631_board`, `wiscore_rak3401`, `wio_tracker_l1`,
+`promicro_nrf52840`, `xiao_nrf52840_ble`, `xiao_nrf52840_ble_sense`). The two
+are mutually exclusive, since TWIM0 and SPIM0 are one peripheral, and
+`boards.h` `#error`s on a board that names both. `dfu_ble_svc.c`/`dfu_init.c` are the BLE DFU
 service; `flash_nrf5x.c` wraps flash writes. `usb/` is the USB MSC (UF2
 drive) + CDC stack on top of the vendored `lib/tinyusb`. A UF2 block with
 family `CFG_UF2_MESHTASTIC_ERASE_ID` (`usb/uf2/uf2cfg.h`) is a factory-erase
