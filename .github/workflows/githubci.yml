@@ -78,7 +78,7 @@ jobs:
         persist-credentials: false
 
     - name: Install ARM GCC
-      uses: carlosperate/arm-none-eabi-gcc-action@98c40e51546516419841748d3210c290df0d2c6c # v1.13.0
+      uses: carlosperate/arm-none-eabi-gcc-action@0edbb000a5a98e2292b051b463bff6f512547118 # v1.14.0
       with:
         release: '12.3.Rel1'
 
