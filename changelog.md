@@ -1,7 +1,11 @@
 # Adafruit nRF52 Bootloader Changelog
 
-OTAFIX 2.1–2.5 are Meshtastic's fork; everything from 0.6.2 down predates
+OTAFIX 2.1–2.6 are Meshtastic's fork; everything from 0.6.2 down predates
 it and is upstream Adafruit history, kept for provenance.
+
+## OTAFIX 2.6
+
+- New board: Seeed Studio Wio Tracker L1 Pro 1W (OTA DFU advertising name `WTLP_DFU`).
 
 ## OTAFIX 2.5
 

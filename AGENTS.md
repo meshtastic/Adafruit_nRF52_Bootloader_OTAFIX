@@ -67,7 +67,7 @@ Each board directory can carry:
   `src/screen.c`.
 - `board.mk` — Makefile board config (`MCU_SUB_VARIANT`, per-board
   `CFLAGS` like the BLE `DEVICE_NAME`).
-- `board.cmake` — **only exists for 5 of 19 boards** (`heltec_t096`,
+- `board.cmake` — **only exists for 5 of 20 boards** (`heltec_t096`,
   `heltec_t1`, `heltec_t114`, `mesh_tracker_x1`, `thinknode_m1`). `cmake -DBOARD=<anything
   else>` fails outright. Nobody
   uses the CMake path in practice (CI and `tools/build_all.py` both use
@@ -132,7 +132,7 @@ submodule) — `SD_NAME`/`SD_VERSION` in `Makefile` select which one.
 ### CI (`.github/workflows/githubci.yml`)
 
 A `set-matrix` job lists `src/boards/*/` and fans out a `build` job per
-board (currently 19), on every PR and on `release: created`. On release
+board (currently 20), on every PR and on `release: created`. On release
 events a single `release` job downloads every board's artifacts and uploads
 `.zip`/`.hex`/`update-*.uf2` per board plus `tools/meshtastic_factory_erase.uf2`
 as release assets; PR runs just validate the compile and get 1-day artifact
@@ -140,7 +140,7 @@ retention (release runs keep 90). Only `release` holds `contents: write` —
 every job that runs repo code (`make`, `tools/`) is read-only with
 `persist-credentials: false`, so a PR cannot borrow a write token.
 
-Branch protection on `master` requires all 20 checks (`set-matrix` + 19
+Branch protection on `master` requires all 21 checks (`set-matrix` + 20
 `build (<board>)` contexts) by literal name. **Adding, removing, or renaming
 a board changes those context names** — branch protection does not update
 itself; a human has to edit it too.
