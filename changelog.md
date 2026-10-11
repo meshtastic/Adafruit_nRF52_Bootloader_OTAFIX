@@ -5,6 +5,7 @@ it and is upstream Adafruit history, kept for provenance.
 
 ## OTAFIX 2.6
 
+- New board: Seeed Studio Wio Tracker L1 Pro 1W (OTA DFU advertising name `WTLP_DFU`).
 - A board with a valid application that sits in DFU for 6 minutes with no activity boots its application. A BLE connection or DFU write, a UF2 drive read or write, USB enumeration, and serial DFU traffic each restart the 6 minutes; a board with no valid application keeps waiting.
 - A SoftDevice flash timeout during a BLE or serial transfer, or the activation settings save, is retried every 100 ms, up to 20 times, instead of resetting the bootloader.
 - `INFO_UF2.TXT` shows a `Last-Fault: id=0x.. pc=0x.. info=0x..` line for a SoftDevice or SDK fault the bootloader recorded since the last UF2 drive session. It appears only if the next boot reaches the drive before an application boots, since the application's RAM use wipes the record. The record lives in a 16-byte RAM region behind a magic word and is cleared once printed; for an SDK error `info` is the error code.
