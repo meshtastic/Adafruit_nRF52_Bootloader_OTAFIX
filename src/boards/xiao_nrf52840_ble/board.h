@@ -56,8 +56,9 @@
 #define DISPLAY_CONTROLLER_SSD1306
 #define DISPLAY_I2C_ADDR      0x3C
 
-#define DISPLAY_PIN_SDA       _PINNUM(0, 30)
-#define DISPLAY_PIN_SCL       _PINNUM(0, 31)
+// The variant's PIN_WIRE_SDA/SCL 30/31 are D30/D31, i.e. NFC1/NFC2.
+#define DISPLAY_PIN_SDA       _PINNUM(0, 9)
+#define DISPLAY_PIN_SCL       _PINNUM(0, 10)
 
 #define DISPLAY_WIDTH         128
 #define DISPLAY_HEIGHT        64
