@@ -60,10 +60,11 @@ No lint, no test suite — this is a bootloader; the only correctness signal is
 ### Board abstraction: `src/boards/<board>/`
 
 Each board directory can carry:
-- `board.h` — pin/peripheral defines (`DISPLAY_PIN_SCK` or `DISPLAY_PIN_SDA`
-  gates the display code in `src/screen.c` and `src/images.c`, through the
-  `BOARD_HAS_DISPLAY` those two set; `BLEDIS_MANUFACTURER`/`BLEDIS_MODEL`
-  are the real vendor name, e.g. RAKWireless — don't rebrand these).
+- `board.h` — pin/peripheral defines. Defining `DISPLAY_PIN_SCK` (SPI TFT)
+  or `DISPLAY_PIN_SDA` (I2C OLED), never both, makes `src/boards/boards.h`
+  define `BOARD_HAS_DISPLAY`, which gates the display code in `src/screen.c`
+  and `src/images.c`. `BLEDIS_MANUFACTURER`/`BLEDIS_MODEL` are the real
+  vendor name, e.g. RAKWireless — don't rebrand these.
   Defining `BANNER_TEXT` overrides the on-screen DFU banner default in
   `src/screen.c`.
 - `board.mk` — Makefile board config (`MCU_SUB_VARIANT`, per-board
