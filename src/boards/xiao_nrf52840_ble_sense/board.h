@@ -49,25 +49,18 @@
 /*------------------------------------------------------------------*/
 /* DISPLAY - optional SSD1306 OLED (user-wired)
  *
- * The XIAO variant offers three I2C pinouts depending on build flags; these
- * are the kit default (NFC pins). On a board wired to D4/D5 or D6/D7 the
- * probe finds nothing and the screen stays blank, which is harmless.
+ * The kit-default I2C pins (NFC1/NFC2); the variant's D4/D5 and D6/D7
+ * layouts get no screen.
  *------------------------------------------------------------------*/
 #define DISPLAY_CONTROLLER_SSD1306
 #define DISPLAY_I2C_ADDR      0x3C
 
-// The variant's PIN_WIRE_SDA/SCL 30/31 are D30/D31, i.e. NFC1/NFC2.
+// The variant's PIN_WIRE_SDA/SCL 30/31 are logical pins D30/D31.
 #define DISPLAY_PIN_SDA       _PINNUM(0, 9)
 #define DISPLAY_PIN_SCL       _PINNUM(0, 10)
 
 #define DISPLAY_WIDTH         128
 #define DISPLAY_HEIGHT        64
-// Not yet verified on hardware. Offset 0 is right for a true 128-column
-// SSD1306; a 132-column SH1106 will sit 2px left of centre, in which case set
-// DISPLAY_COL_OFFSET to 2. Blanking spans 132 either way so no uncovered
-// column can show power-up garbage.
-#define DISPLAY_COL_OFFSET    0
-#define DISPLAY_GDDRAM_WIDTH  132
 
 #define DISPLAY_TITLE         "XIAO Sense"
 

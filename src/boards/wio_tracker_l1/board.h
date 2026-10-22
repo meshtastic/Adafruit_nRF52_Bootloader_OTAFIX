@@ -55,9 +55,7 @@
 
 #define DISPLAY_WIDTH         128
 #define DISPLAY_HEIGHT        64
-// 132-column SH1106 with the 128 visible columns centred.
 #define DISPLAY_COL_OFFSET    2
-#define DISPLAY_GDDRAM_WIDTH  132
 
 #define DISPLAY_TITLE         "TRACKER L1"
 

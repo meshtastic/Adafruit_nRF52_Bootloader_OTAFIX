@@ -99,8 +99,7 @@
 #define BLE_OTA_Y             38
 #define DRAG 34
 #define DRAGX 4
-// Three 32px icons have to fit in 160px: the default pendriveLogo_X of
-// 129 puts the last one at x=133..164, off the right edge of the panel.
+// Keeps the third 32px icon inside the 160px panel.
 #define pendriveLogo_X        124
 
 //--------------------------------------------------------------------+

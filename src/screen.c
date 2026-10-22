@@ -26,11 +26,8 @@
 
 #ifdef BOARD_HAS_DISPLAY
 
-// Defaults for 1bpp mono panels. The stock geometry below is sized for a
-// 240x135 TFT and does not fit a typical 128x64 OLED, so give mono boards a
-// four-line layout (title / mode / version / banner) out of the box. A board
-// only has to declare its bus and title; anything here can still be
-// overridden per board.
+// Four-line layout (title, mode, version, banner) for 1bpp panels; a board
+// can override any of it.
 #ifdef DISPLAY_MONO
 #if DISPLAY_HEIGHT < 96
 // Three 32x32 icons need 96x32; that plus four text lines does not fit.
@@ -45,8 +42,7 @@
 #define BANNER_TEXT          "meshtastic.org"
 #endif
 
-// The colour bars are dark in mono, so bar 1 simply spans the panel and the
-// other two collapse; this also keeps drawBar inside the frame buffer.
+// The bars draw dark in mono: bar 1 spans the panel and the others collapse.
 #ifndef SCREEN_BAR1_Y
 #define SCREEN_BAR1_Y        0
 #endif
@@ -225,8 +221,7 @@ static void printicon(int x, int y, int color, const uint8_t* icon) {
   int h = *icon++;
   int sz = *icon++;
 
-  // The decode loop below writes w*h bytes straight into frame_buf with no
-  // clipping of its own, so anything that would land outside is dropped.
+  // The decode loop does not clip.
   if (x < 0 || y < 0 || x + w > DISPLAY_WIDTH || y + h > DISPLAY_HEIGHT) {
     return;
   }
@@ -304,11 +299,8 @@ static inline void print_centered(int y, int color, const char* text, int size) 
 
 #ifdef DISPLAY_MONO
 
-// One bit per pixel, so the 16-entry palette collapses to "lights a pixel or
-// does not". The layout above only ever draws foreground in white (text,
-// icons) and purple (the version string); the three background bars use
-// colours that stay dark. That is what lets the colour layout survive the
-// conversion without being redrawn for mono.
+// Only white (text, icons) and purple (version) light a pixel; the bar
+// colors stay dark.
 #define MONO_LIT_MASK   ((1u << COLOR_WHITE) | (1u << COLOR_PURPLE))
 
 static void draw_screen(uint8_t const* fb) {
@@ -354,8 +346,7 @@ static void draw_screen(uint8_t const* fb) {
 
 // draw color bar
 static void drawBar(int y, int h, int color) {
-  // Clamp to the panel: the default bar geometry is sized for a 240x135
-  // screen and would run off the end of a column on a shorter one.
+  // The default bar geometry assumes a 240x135 panel.
   if (y < 0) {
     h += y;
     y = 0;
@@ -384,9 +375,6 @@ void screen_draw_drag(void) {
   print_centered(BANNER_TEXT_Y, COLOR_WHITE, BANNER_TEXT, 1);
 
 #ifdef DISPLAY_NO_DRAG_ICONS
-  // The icon row is three 32x32 glyphs, 96px wide and 32px tall before any
-  // spacing. A 128x64 panel cannot carry that and the four text lines, so
-  // name the mode instead.
   print_centered(DRAG_TEXT_Y, COLOR_WHITE, DRAG_TEXT, FONT_SIZE_LARGE);
 #else
 #ifndef DRAG

@@ -48,10 +48,6 @@
 
 /*------------------------------------------------------------------*/
 /* DISPLAY - optional SSD1306 OLED (RAK1921) on a WisBlock IO slot
- *
- * The panel is a plug-in module, so this is best-effort: board_display_init()
- * probes the I2C address and reports absence rather than blocking, and drops
- * the slot rail again when nothing answers.
  *------------------------------------------------------------------*/
 #define DISPLAY_CONTROLLER_SSD1306
 
@@ -60,19 +56,14 @@
 #define DISPLAY_PIN_SCL       _PINNUM(0, 14)
 #define DISPLAY_I2C_ADDR      0x3C
 
-// The slots are fed from the switchable 3V3_S rail (WB_IO2), which is off
-// out of reset - the bootloader has to raise it before the panel answers.
+// Switchable 3V3_S rail (WB_IO2) feeding the slots, off out of reset.
 #define DISPLAY_VSENSOR_PIN   _PINNUM(1, 2)
 #define DISPLAY_VSENSOR_ON    1
 
 #define DISPLAY_WIDTH         128
 #define DISPLAY_HEIGHT        64
-// This panel has 132 columns of GDDRAM behind 128px of glass, so the visible
-// window starts at column 2. Confirmed on hardware: with an offset of 0 the
-// image sat 2px left of the glass and the two uncovered columns on the right
-// showed power-up garbage.
+// The RAK1921 centers 128 columns of glass in 132 columns of GDDRAM.
 #define DISPLAY_COL_OFFSET    2
-#define DISPLAY_GDDRAM_WIDTH  132
 
 #define DISPLAY_TITLE         "RAK4631"
 

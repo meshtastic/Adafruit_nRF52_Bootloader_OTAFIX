@@ -117,10 +117,8 @@ bool is_ota(void);
 //--------------------------------------------------------------------+
 // Display
 //--------------------------------------------------------------------+
-// A board opts into the DFU screens by naming a display bus in board.h:
-// DISPLAY_PIN_SCK for the SPI TFT path, DISPLAY_PIN_SDA for the I2C mono
-// path. They are mutually exclusive: TWIM0 and SPIM0 are the same
-// peripheral ID and cannot both be enabled.
+// A board opts in with DISPLAY_PIN_SCK (SPI TFT) or DISPLAY_PIN_SDA (I2C
+// OLED), never both: TWIM0 and SPIM0 share a peripheral ID.
 #if defined(DISPLAY_PIN_SCK) && defined(DISPLAY_PIN_SDA)
 #error "board.h defines both DISPLAY_PIN_SCK and DISPLAY_PIN_SDA - pick one display bus"
 #endif
@@ -129,15 +127,13 @@ bool is_ota(void);
 #define BOARD_HAS_DISPLAY   1
 #endif
 
-// Mono (1bpp paged) panels vs 16-bit colour TFTs.
+// Mono (1bpp paged) panels vs 16-bit color TFTs.
 #if defined(DISPLAY_CONTROLLER_SSD1306) || defined(DISPLAY_CONTROLLER_SH1106)
 #define DISPLAY_MONO        1
 #endif
 
 #ifdef BOARD_HAS_DISPLAY
-// Returns false if no panel answered, in which case nothing else here may be
-// called. Only the I2C path can fail: an OLED is a plug-in module on some
-// boards, so its absence is a normal condition, not an error.
+// False if no panel answered; nothing else here may be called then.
 bool board_display_init(void);
 void board_display_teardown(void);
 void screen_draw_drag(void);
