@@ -984,7 +984,18 @@ static void tft_controller_init(void) {
 
 static bool _display_present = false;
 
-static void oled_write_page(uint8_t page, uint8_t col, uint8_t const* buf, size_t nbytes);
+static bool oled_write_page(uint8_t page, uint8_t col, uint8_t const* buf, size_t nbytes);
+
+// Leaves the bus idle and, with no panel to feed, the switched rail off as
+// it was before DFU.
+static bool display_init_failed(void) {
+  _display_present = false;
+  nrf_twim_disable(_twim);
+#if defined(DISPLAY_VSENSOR_PIN) && DISPLAY_VSENSOR_PIN >= 0
+  nrf_gpio_pin_write(DISPLAY_VSENSOR_PIN, !DISPLAY_VSENSOR_ON);
+#endif
+  return false;
+}
 
 // Blocking write of a whole I2C transaction. Returns false on NACK, bus
 // error, or timeout, leaving the peripheral idle and ready for the next try.
@@ -1005,7 +1016,9 @@ static bool twi_write(uint8_t const* buf, size_t len) {
   bool const ok = (guard != 0) && !nrf_twim_event_check(_twim, NRF_TWIM_EVENT_ERROR);
 
   if (!ok) {
-    // An address NACK or a stuck bus can leave the transfer half-done.
+    // An address NACK or a stuck bus can leave the transfer half-done. A NACK
+    // suspends the master, which ignores STOP until resumed (as nrfx does).
+    nrf_twim_task_trigger(_twim, NRF_TWIM_TASK_RESUME);
     nrf_twim_task_trigger(_twim, NRF_TWIM_TASK_STOP);
     guard = TWI_GUARD_LOOPS;
     while (!nrf_twim_event_check(_twim, NRF_TWIM_EVENT_STOPPED) && --guard) {}
@@ -1048,8 +1061,7 @@ bool board_display_init(void) {
   // there is no panel, and we leave the bus alone from here on.
   uint8_t probe[] = { OLED_CTRL_CMD, 0xAE };
   if (!oled_cmds(probe, sizeof(probe))) {
-    nrf_twim_disable(_twim);
-    return false;
+    return display_init_failed();
   }
 
   uint8_t init[] = {
@@ -1081,8 +1093,7 @@ bool board_display_init(void) {
       0x2E,                             // scrolling off
   };
   if (!oled_cmds(init, sizeof(init))) {
-    nrf_twim_disable(_twim);
-    return false;
+    return display_init_failed();
   }
 
   _display_present = true;
@@ -1092,16 +1103,16 @@ bool board_display_init(void) {
   uint8_t blank[DISPLAY_GDDRAM_WIDTH];
   memset(blank, 0, sizeof(blank));
   for (uint8_t page = 0; page < DISPLAY_HEIGHT / 8; ++page) {
-    oled_write_page(page, 0, blank, sizeof(blank));
+    if (!oled_write_page(page, 0, blank, sizeof(blank))) {
+      return display_init_failed();
+    }
   }
 
   // Display on. The probe above sent 0xAE; without this the panel stays
   // dark no matter what we write to it.
   uint8_t on[] = { OLED_CTRL_CMD, 0xAF };
   if (!oled_cmds(on, sizeof(on))) {
-    _display_present = false;
-    nrf_twim_disable(_twim);
-    return false;
+    return display_init_failed();
   }
 
   return true;
@@ -1116,8 +1127,8 @@ void board_display_teardown(void) {
   nrf_twim_disable(_twim);
 }
 
-static void oled_write_page(uint8_t page, uint8_t col, uint8_t const* buf, size_t nbytes) {
-  if (!_display_present || nbytes > DISPLAY_GDDRAM_WIDTH) return;
+static bool oled_write_page(uint8_t page, uint8_t col, uint8_t const* buf, size_t nbytes) {
+  if (!_display_present || nbytes > DISPLAY_GDDRAM_WIDTH) return false;
 
   // Page addressing: set the page, then the low and high nibbles of the
   // starting column, then stream the row.
@@ -1127,19 +1138,19 @@ static void oled_write_page(uint8_t page, uint8_t col, uint8_t const* buf, size_
       (uint8_t)(0x00 | (col & 0x0F)),
       (uint8_t)(0x10 | ((col >> 4) & 0x0F)),
   };
-  if (!oled_cmds(addr, sizeof(addr))) return;
+  if (!oled_cmds(addr, sizeof(addr))) return false;
 
   // The control byte has to be contiguous with the pixels for EasyDMA, and
   // the caller's buffer has no room in front of it.
   static uint8_t page_buf[1 + DISPLAY_GDDRAM_WIDTH];
   page_buf[0] = OLED_CTRL_DATA;
   memcpy(page_buf + 1, buf, nbytes);
-  (void) twi_write(page_buf, nbytes + 1);
+  return twi_write(page_buf, nbytes + 1);
 }
 
 void board_display_draw_page(uint8_t page, uint8_t const* buf, size_t nbytes) {
   if (nbytes > DISPLAY_WIDTH) return;
-  oled_write_page(page, DISPLAY_COL_OFFSET, buf, nbytes);
+  (void) oled_write_page(page, DISPLAY_COL_OFFSET, buf, nbytes);
 }
 
 #endif // DISPLAY_PIN_SDA

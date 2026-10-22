@@ -50,8 +50,8 @@
 /* DISPLAY - optional SSD1306 OLED (RAK1921) on a WisBlock IO slot
  *
  * The panel is a plug-in module, so this is best-effort: board_display_init()
- * probes the I2C address and reports absence rather than blocking, and a
- * board with an empty slot behaves exactly as it did before.
+ * probes the I2C address and reports absence rather than blocking, and drops
+ * the slot rail again when nothing answers.
  *------------------------------------------------------------------*/
 #define DISPLAY_CONTROLLER_SSD1306
 

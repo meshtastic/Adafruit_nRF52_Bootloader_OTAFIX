@@ -50,8 +50,8 @@
 /* DISPLAY - optional SSD1306 OLED on a WisBlock IO slot
  *
  * Pin- and rail-identical to the RAK4631; the panel is a plug-in module, so
- * board_display_init() probes for it and a board with an empty slot behaves
- * exactly as it did before.
+ * board_display_init() probes for it and drops the slot rail again when
+ * nothing answers.
  *------------------------------------------------------------------*/
 #define DISPLAY_CONTROLLER_SSD1306
 #define DISPLAY_I2C_ADDR      0x3C
