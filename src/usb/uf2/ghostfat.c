@@ -35,6 +35,7 @@
 
 #include "bootloader_settings.h"
 #include "bootloader.h"
+#include "boards.h"
 
 //--------------------------------------------------------------------+
 //
@@ -495,6 +496,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
        */
       if ( in_app_space(bl->targetAddr) )
       {
+        screen_set_title(NULL); // a good block after a rejected one clears WRONG FILE
         PRINTF("Write addr = 0x%08lX, block = %ld (%ld of %ld)\r\n", bl->targetAddr, bl->blockNo, state->numWritten, bl->numBlocks);
         flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
         if ( bl->targetAddr + bl->payloadSize > state->appEnd ) state->appEnd = bl->targetAddr + bl->payloadSize;
@@ -505,7 +507,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
         PRINTF("skip writing to MBR\r\n");
       }else
       {
-        return -1;
+        goto reject;
       }
     break;
 
@@ -543,6 +545,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       PRINTF("addr = 0x%08lX, block = %ld (%ld of %ld)\r\n", bl->targetAddr, bl->blockNo, state->numWritten, bl->numBlocks);
 
       state->update_bootloader = true;
+      screen_set_title("BOOTLOADER");
       if ( in_uicr_space(bl->targetAddr) )
       {
         /* UCIR contains bootloader & MBR address as follow:
@@ -567,7 +570,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
           PRINT_HEX(uicr_mbr_param);
 
           state->aborted = true;
-          return -1;
+          goto reject;
         }
 
         state->has_uicr = true;
@@ -599,7 +602,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
               {
                 PRINTF("DOES NOT match our VID/PID\r\n");
                 state->aborted = true;
-                return -1;
+                goto reject;
               }
             }
           }
@@ -623,7 +626,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       else
       {
         state->aborted = true;
-        return -1;
+        goto reject;
       }
     break;
 
@@ -632,10 +635,11 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       // msc_uf2.c once the host has acknowledged the write.
       PRINTF("Factory erase requested\r\n");
       state->factory_erase = true;
+      screen_set_title("ERASE");
     break;
 
     // unknown family ID
-    default: return -1;
+    default: goto reject;
   }
 
   //------------- Update written blocks -------------//
@@ -660,6 +664,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       {
         state->writtenMask[pos] |= mask;
         state->numWritten++;
+        screen_set_progress(state->numWritten, state->numBlocks);
       }
 
       // flush last blocks
@@ -678,4 +683,9 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
   }
 
   return BPB_SECTOR_SIZE;
+
+  // A UF2 block this board cannot take: another family, board or address.
+reject:
+  screen_set_title("WRONG FILE");
+  return -1;
 }
