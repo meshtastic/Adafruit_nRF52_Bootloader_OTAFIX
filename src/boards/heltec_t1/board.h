@@ -99,6 +99,8 @@
 #define BLE_OTA_Y             38
 #define DRAG 34
 #define DRAGX 4
+// Keeps the third 32px icon inside the 160px panel.
+#define pendriveLogo_X        124
 
 //--------------------------------------------------------------------+
 // BLE OTA

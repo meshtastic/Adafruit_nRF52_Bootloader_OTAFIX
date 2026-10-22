@@ -46,6 +46,29 @@
 #define BUTTON_2              _PINNUM(0, 8)	// change default 0.0 to 0.8, add by Michael. This pin is not connected on 4631. 
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
+/*------------------------------------------------------------------*/
+/* DISPLAY - optional SSD1306 OLED on a WisBlock IO slot
+ *
+ * Pins and rail match the RAK4631.
+ *------------------------------------------------------------------*/
+#define DISPLAY_CONTROLLER_SSD1306
+#define DISPLAY_I2C_ADDR      0x3C
+
+// WB_I2C1, shared by the sensor and IO slots.
+#define DISPLAY_PIN_SDA       _PINNUM(0, 13)
+#define DISPLAY_PIN_SCL       _PINNUM(0, 14)
+
+// Switchable 3V3_S rail (WB_IO2), off out of reset.
+#define DISPLAY_VSENSOR_PIN   _PINNUM(1, 2)
+#define DISPLAY_VSENSOR_ON    1
+
+#define DISPLAY_WIDTH         128
+#define DISPLAY_HEIGHT        64
+// The RAK1921 centers 128 columns of glass in 132 columns of GDDRAM.
+#define DISPLAY_COL_OFFSET    2
+
+#define DISPLAY_TITLE         "RAK3401"
+
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+

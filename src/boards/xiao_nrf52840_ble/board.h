@@ -46,6 +46,24 @@
 #define BUTTON_2              _PINNUM(0, 3)
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
+/*------------------------------------------------------------------*/
+/* DISPLAY - optional SSD1306 OLED (user-wired)
+ *
+ * The kit-default I2C pins (NFC1/NFC2); the variant's D4/D5 and D6/D7
+ * layouts get no screen.
+ *------------------------------------------------------------------*/
+#define DISPLAY_CONTROLLER_SSD1306
+#define DISPLAY_I2C_ADDR      0x3C
+
+// The variant's PIN_WIRE_SDA/SCL 30/31 are logical pins D30/D31.
+#define DISPLAY_PIN_SDA       _PINNUM(0, 9)
+#define DISPLAY_PIN_SCL       _PINNUM(0, 10)
+
+#define DISPLAY_WIDTH         128
+#define DISPLAY_HEIGHT        64
+
+#define DISPLAY_TITLE         "XIAO"
+
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+

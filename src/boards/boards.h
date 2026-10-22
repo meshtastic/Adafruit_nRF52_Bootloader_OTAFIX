@@ -117,12 +117,34 @@ bool is_ota(void);
 //--------------------------------------------------------------------+
 // Display
 //--------------------------------------------------------------------+
-#ifdef DISPLAY_PIN_SCK
-void board_display_init(void);
+// A board opts in with DISPLAY_PIN_SCK (SPI TFT) or DISPLAY_PIN_SDA (I2C
+// OLED), never both: TWIM0 and SPIM0 share a peripheral ID.
+#if defined(DISPLAY_PIN_SCK) && defined(DISPLAY_PIN_SDA)
+#error "board.h defines both DISPLAY_PIN_SCK and DISPLAY_PIN_SDA - pick one display bus"
+#endif
+
+#if defined(DISPLAY_PIN_SCK) || defined(DISPLAY_PIN_SDA)
+#define BOARD_HAS_DISPLAY   1
+#endif
+
+// Mono (1bpp paged) panels vs 16-bit color TFTs.
+#if defined(DISPLAY_CONTROLLER_SSD1306) || defined(DISPLAY_CONTROLLER_SH1106)
+#define DISPLAY_MONO        1
+#endif
+
+#ifdef BOARD_HAS_DISPLAY
+// False if no panel answered; nothing else here may be called then.
+bool board_display_init(void);
 void board_display_teardown(void);
-void board_display_draw_line(uint16_t y, uint8_t const* buf, size_t nbytes);
 void screen_draw_drag(void);
 void screen_draw_ble(void);
+
+#ifdef DISPLAY_MONO
+// One 8-row page, DISPLAY_WIDTH bytes, LSB = topmost row of the page.
+void board_display_draw_page(uint8_t page, uint8_t const* buf, size_t nbytes);
+#else
+void board_display_draw_line(uint16_t y, uint8_t const* buf, size_t nbytes);
+#endif
 #endif
 
 //--------------------------------------------------------------------+

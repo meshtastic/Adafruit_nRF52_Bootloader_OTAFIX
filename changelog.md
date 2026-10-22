@@ -1,7 +1,12 @@
 # Adafruit nRF52 Bootloader Changelog
 
-OTAFIX 2.1–2.5 are Meshtastic's fork; everything from 0.6.2 down predates
+OTAFIX 2.1–2.6 are Meshtastic's fork; everything from 0.6.2 down predates
 it and is upstream Adafruit history, kept for provenance.
+
+## OTAFIX 2.6
+
+- DFU screens on I2C mono OLEDs (SSD1306 and SH1106), with a four-line layout: title, mode, version, and banner. A board opts in by defining `DISPLAY_PIN_SDA` in its `board.h`; `boards.h` rejects a board that also defines `DISPLAY_PIN_SCK`, since TWIM0 and SPIM0 share a peripheral. The bootloader probes 0x3C and 0x3D and reads the controller type off the panel, and a board with no panel shows nothing and otherwise behaves as before. Enabled on `wiscore_rak4631_board`, `wiscore_rak3401`, `wio_tracker_l1`, `promicro_nrf52840`, `xiao_nrf52840_ble`, and `xiao_nrf52840_ble_sense`, for about 2 KB of bootloader flash each. Verified on the RAK4631 and the Wio Tracker L1; the other four follow their firmware variants' pins. On the RAK4631 and RAK3401, DFU raises the switched 3V3_S rail (WB_IO2) that feeds the WisBlock slots, and lowers it again when no panel answers.
+- Fixed an out-of-bounds write in `printicon()` on the 160x80 `heltec_t096` and `heltec_t1`, where the third drag icon ran past the end of `frame_buf`. Those boards place it inside the panel, and `printicon()` skips any icon that would land outside.
 
 ## OTAFIX 2.5
 

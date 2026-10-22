@@ -44,6 +44,21 @@
 #define BUTTON_2              _PINNUM(0, 8)
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
+/*------------------------------------------------------------------*/
+/* DISPLAY - SH1106 OLED at 0x3D on the firmware's Wire bus (D14/D15)
+ *------------------------------------------------------------------*/
+#define DISPLAY_CONTROLLER_SH1106
+#define DISPLAY_I2C_ADDR      0x3D
+
+#define DISPLAY_PIN_SDA       _PINNUM(0, 6)
+#define DISPLAY_PIN_SCL       _PINNUM(0, 5)
+
+#define DISPLAY_WIDTH         128
+#define DISPLAY_HEIGHT        64
+#define DISPLAY_COL_OFFSET    2
+
+#define DISPLAY_TITLE         "TRACKER L1"
+
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
