@@ -302,6 +302,8 @@ endif
 
 # Defined Symbol (MACROS)
 CFLAGS += -D__HEAP_SIZE=0
+# Reset_Handler zeroes .bss and calls main directly, so newlib's crt0 is not linked in.
+CFLAGS += -D__START=main -D__STARTUP_CLEAR_BSS
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
 
 # Skip defining CONFIG_NFCT_PINS_AS_GPIOS if the device uses the NFCT.
