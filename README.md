@@ -19,6 +19,7 @@ Current release: **OTAFIX 2.5** — see [changelog.md](changelog.md) for version
 - [Notes on Xiao NRF52840 BLE](#notes-on-xiao-nrf52840-ble)
 - [Notes on RAK4631 bootloader](#notes-on-rak4631-bootloader)
 - [Notes on single-button boards: T1000-E and MeshTracker X1](#notes-on-single-button-boards-t1000-e-and-meshtracker-x1)
+- [Notes on Nano G2 Ultra](#notes-on-nano-g2-ultra)
 - [Contributing](#contributing)
 - [Getting help](#getting-help)
 - [License](#license)
@@ -72,6 +73,7 @@ bootloader and SoftDevice zip package").
 ---
 
 ## Boards supported
+- BQ Nano G2 Ultra ([See note](#notes-on-nano-g2-ultra))
 - Elecrow ThinkNode M1
 - Elecrow ThinkNode M3
 - Elecrow ThinkNode M6
@@ -253,6 +255,15 @@ To leave DFU mode, eject the mounted drive: the bootloader exits DFU and boots t
 Unplugging is not a way out. The board stays in the bootloader on battery, with no LED on the X1 to show it, and plugging it back in only mounts the drive again. Eject the drive (or copy a `.uf2` across) to boot the application.
 
 Before OTAFIX 2.5 the T1000-E had no button path into DFU at all (the bootloader read the button with the wrong polarity), and an eject did not leave DFU. On those bootloaders, enter UF2 mode from the application instead: `meshtastic --enter-dfu` or the Meshtastic Android app; then install the file for your board from the [releases](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/releases) to get the button: `update-t1000_e_bootloader-*.uf2` on the T1000-E, `update-mesh_tracker_x1_bootloader-*.uf2` on the X1. The two boards share a USB VID/PID, which is what the bootloader's self-update check keys on, so it accepts the wrong board's file without complaint. Avoid the 1200 bps serial touch on these boards: it selects serial-only DFU (`DFU_MAGIC_SERIAL_ONLY_RESET`), which exposes no drive, has no eject to leave by, and the serial DFU protocol carries no reset request, so the only way out is completing a serial DFU with `adafruit-nrfutil`.
+
+## Notes on Nano G2 Ultra
+
+Support for this board was added without access to the physical hardware — it builds and links cleanly, but **has not been tested on a real device**. Two things in particular need confirming before relying on it:
+
+- The board appears to have no onboard LED (none found in the [firmware variant's](https://github.com/meshtastic/firmware/tree/master/variants/nrf52840/nano-g2-ultra) pin definitions), so this bootloader's UF2/BLE-OTA status is reported via the board's screen only — not supported by this bootloader today — meaning there's currently no visual status feedback in bootloader mode at all.
+- The board's single physical button is wired to both button slots this bootloader requires (see `src/boards/nano_g2_ultra/board.h`), and its USB PID was picked to avoid colliding with other boards in this repo rather than confirmed against a real allocation.
+
+If you have this hardware, please try it and report back on [the tracking issue](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/issues/4).
 
 ---
 
