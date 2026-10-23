@@ -345,7 +345,8 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout
       dfu_startup_packet_received = false;
 
       app_timer_create(&_dfu_startup_timer, APP_TIMER_MODE_SINGLE_SHOT, dfu_startup_timer_handler);
-      app_timer_start(_dfu_startup_timer, APP_TIMER_TICKS(timeout_ms), NULL);
+      // APP_TIMER_TICKS is 64-bit and pulls __udivmoddi4 into the image; this is the same rounding for timeout_ms < 131 s.
+      app_timer_start(_dfu_startup_timer, ((timeout_ms * 32768u + 500u) / 1000u), NULL);
     }
 
     err_code = dfu_transport_serial_update_start();
