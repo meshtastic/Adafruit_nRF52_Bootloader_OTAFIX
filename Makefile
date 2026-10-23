@@ -264,6 +264,7 @@ CFLAGS += \
 	-mfpu=fpv4-sp-d16 \
 	-ggdb \
 	-Os \
+	-flto \
 	-ffunction-sections \
 	-fdata-sections \
 	-fno-builtin \
