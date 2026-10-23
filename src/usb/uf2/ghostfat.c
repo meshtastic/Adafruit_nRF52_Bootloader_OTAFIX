@@ -132,7 +132,8 @@ STATIC_ASSERT(FAT_ENTRIES_PER_SECTOR                       ==       256); // FAT
     "Date: " __DATE__ "\r\n" \
     "Factory-Erase: UF2 family 0x4D455348\r\n"
 
-char infoUf2File[128*3] = INFO_UF2_TEXT;
+static const char infoUf2Text[] = INFO_UF2_TEXT;
+char infoUf2File[128*3];
 // uf2_init() appends "SoftDevice: S140 7.3.0\r\n" at runtime; 40 covers the
 // widest values the id/version fields can print
 STATIC_ASSERT(sizeof(INFO_UF2_TEXT) + 40 <= sizeof(infoUf2File));
@@ -309,6 +310,7 @@ static inline bool in_uicr_space(uint32_t addr)
 
 void uf2_init(void)
 {
+  strcpy(infoUf2File, infoUf2Text);
   strcat(infoUf2File, "SoftDevice: ");
 
   if ( is_sd_existed() )
