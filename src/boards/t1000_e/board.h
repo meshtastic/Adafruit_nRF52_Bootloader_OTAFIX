@@ -63,12 +63,6 @@
  * drive therefore leaves DFU and boots the application. */
 #define UF2_EXIT_ON_EJECT
 
-/* P0.18 is RESET and is not exposed as a button, so there is no way to reset
- * out of UF2 mode once in it, and the host just re-mounts the drive if we stay
- * enumerated. Ejecting the drive therefore leaves DFU and boots the
- * application. */
-#define UF2_EXIT_ON_EJECT
-
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+

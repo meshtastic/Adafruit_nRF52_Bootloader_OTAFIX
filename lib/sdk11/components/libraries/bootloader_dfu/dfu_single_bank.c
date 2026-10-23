@@ -108,6 +108,7 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
         if (dfu_image_page_count < 1) dfu_image_page_count = 1; // This should not happen
 
         static uint8_t dfu_page_erased_static[256];
+        _Static_assert(sizeof(dfu_page_erased_static) >= (BOOTLOADER_REGION_START - MBR_SIZE - DFU_APP_DATA_RESERVED) / CODE_PAGE_SIZE, "lazy-erase page map smaller than the app region");
         dfu_page_erased = dfu_page_erased_static;
         memset(dfu_page_erased, 0, dfu_image_page_count);
 
