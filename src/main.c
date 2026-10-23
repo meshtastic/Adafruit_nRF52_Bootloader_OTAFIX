@@ -78,6 +78,7 @@
 void usb_init(bool cdc_only);
 void usb_teardown(void);
 bool msc_factory_erase_pending(void);
+bool usb_host_mounted(void);
 
 // tinyusb function that handles power event (detected, ready, removed)
 // We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled.
@@ -87,6 +88,7 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 #define usb_init(x)       led_state(STATE_USB_MOUNTED) // mark nrf52832 as mounted
 #define usb_teardown()
 #define msc_factory_erase_pending() false
+#define usb_host_mounted() false
 
 #endif
 
@@ -211,7 +213,8 @@ int main(void) {
     bootloader_app_start();
   }
 
-  NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET; // No application was loaded, reset the system with the OTA DFU update
+  // Host present: reset plain so the cabled gate returns to the drive. No host: OTA wait.
+  NRF_POWER->GPREGRET = usb_host_mounted() ? 0 : DFU_MAGIC_OTA_RESET;
   NVIC_SystemReset();
 }
 

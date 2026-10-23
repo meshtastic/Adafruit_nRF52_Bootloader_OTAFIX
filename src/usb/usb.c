@@ -112,7 +112,14 @@ void usb_teardown(void) {
 //--------------------------------------------------------------------+
 // tinyusb callbacks
 //--------------------------------------------------------------------+
+static bool _host_mounted;
+
+bool usb_host_mounted(void) {
+  return _host_mounted;
+}
+
 void tud_mount_cb(void) {
+  _host_mounted = true;
   led_state(STATE_USB_MOUNTED);
 }
 
