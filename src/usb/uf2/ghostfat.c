@@ -511,6 +511,13 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
         if ( state->wrong_layout ) goto reject;
 
         screen_set_title(NULL); // a good block after a rejected one clears WRONG FILE
+        if ( !state->app_invalidated )
+        {
+          // A cable pulled mid-copy must not leave the old bank_0 valid over a half-written image.
+          dfu_update_status_t s = { .status_code = DFU_BANK_0_ERASED };
+          bootloader_dfu_update_process(s);
+          state->app_invalidated = true;
+        }
         PRINTF("Write addr = 0x%08lX, block = %ld (%ld of %ld)\r\n", bl->targetAddr, bl->blockNo, state->numWritten, bl->numBlocks);
         flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
         if ( bl->targetAddr + bl->payloadSize > state->appEnd ) state->appEnd = bl->targetAddr + bl->payloadSize;
