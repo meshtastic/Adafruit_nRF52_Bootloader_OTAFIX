@@ -194,12 +194,9 @@ itself; a human has to edit it too.
   otherwise only serial DFU sets it. Lose either and the restored device hangs
   on boot. If you change either file, re-run dump-and-restore on hardware.
 - **Flashing the bootloader+SoftDevice package over serial DFU zeros
-  `bank_0` — the device then boots into BLE-OTA wait mode, not the app,
-  on its own.** After
-  `adafruit-nrfutil dfu serial --package <board>_bootloader-..._s140_...zip`
-  reports "Device programmed", the board goes USB-silent (no serial port,
-  no UF2 drive) because `bank_0_size` is now 0 and this bootloader's
-  documented OTAFIX 2.0+ behavior is to default to BLE-OTA rather than get
-  stuck. This is expected, not a brick: double-press reset to force UF2
-  mode and drag the app's `.uf2` across, or complete a BLE OTA DFU to the
-  same effect. Don't reflash blind expecting the app to still be running.
+  `bank_0` — the device then has no app and does not boot on its own.**
+  After `adafruit-nrfutil dfu serial --package <board>_bootloader-..._s140_...zip`
+  reports "Device programmed", a board on a USB host comes up as a UF2 drive
+  showing NO FIRMWARE; drag the app's `.uf2` across. On battery it falls into
+  the BLE-OTA wait after 3 s (USB-silent): double-press reset for the drive, or
+  complete a BLE OTA DFU.
