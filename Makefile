@@ -333,6 +333,7 @@ ifeq ($(DEBUG), 1)
 endif
 
 CFLAGS += -DDFU_APP_DATA_RESERVED=$(DFU_APP_DATA_RESERVED)
+CFLAGS += -DADAFRUIT_DEV_REV=$(DFU_DEV_REV)
 
 #------------------------------------------------------------------------------
 # Linker Flags

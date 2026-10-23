@@ -461,9 +461,8 @@ void read_block(uint32_t block_no, uint8_t *data) {
 /**
  * Write an uf2 block wrapped by 512 sector.
  * @return number of bytes processed, only 3 following values
- *  -1 : if not an uf2 block
- * 512 : write is successful (BPB_SECTOR_SIZE == 512)
- *   0 : is busy with flashing, tinyusb stack will call write_block again with the same parameters later on
+ *  -1 : if not an uf2 block, or the block is rejected
+ * 512 : otherwise (BPB_SECTOR_SIZE == 512)
  */
 int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
 {
