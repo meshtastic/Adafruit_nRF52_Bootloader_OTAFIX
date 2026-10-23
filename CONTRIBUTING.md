@@ -7,9 +7,8 @@ recover — so a few things here are stricter than a typical repo.
 ## Before you start
 
 - **Read [`AGENTS.md`](./AGENTS.md) first.** It covers the board abstraction,
-  the build system split (`make` vs. the incomplete `CMakeLists.txt`), the
-  vendored submodules, and a list of known gotchas. This file covers
-  process; that one covers the code.
+  the build, the vendored submodules, and a list of known gotchas. This file
+  covers process; that one covers the code.
 - **New board support needs real hardware.** `UF2_BOARD_ID`, VID/PID, and
   pin definitions cannot be guessed from a datasheet alone — see
   [Adding a new board](#adding-a-new-board) below.
@@ -39,10 +38,6 @@ make BOARD=wiscore_rak4631_board copy-artifact   # writes _bin/<board>/
 Board names are the directory names under `src/boards/`. `tools/build_all.py`
 builds every board and prints a pass/fail + size table — run it before
 opening a PR; it's the same check CI's board matrix does per-PR, just local.
-
-**Use `make`, not `cmake`.** `CMakeLists.txt` only has a `board.cmake` for 5
-of the 19 boards; `cmake -DBOARD=<anything else>` fails outright. Nobody
-uses the CMake path in practice.
 
 There is no lint or test suite — for a bootloader, "does it compile for
 every board" (CI's job) and real hardware testing are the correctness
