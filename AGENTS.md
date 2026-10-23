@@ -192,5 +192,6 @@ itself; a human has to edit it too.
   After `adafruit-nrfutil dfu serial --package <board>_bootloader-..._s140_...zip`
   reports "Device programmed", a board on a USB host comes up as a UF2 drive
   showing NO FIRMWARE; drag the app's `.uf2` across. On battery it falls into
-  the BLE-OTA wait after 3 s (USB-silent): double-press reset for the drive, or
-  complete a BLE OTA DFU.
+  the BLE-OTA wait after 3 s (USB-silent), and unplugging the cable while the
+  drive is up does the same: double-press reset for the drive, or complete a
+  BLE OTA DFU.
