@@ -218,6 +218,15 @@ int main(void) {
   NVIC_SystemReset();
 }
 
+// VBUSDETECT can read 0 for a short time after a reset that followed usb_teardown().
+static bool vbus_detected_settled(void) {
+  for (uint32_t waited_ms = 0;; waited_ms += 10) {
+    if (NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk) return true;
+    if (waited_ms >= 500) return false;
+    NRFX_DELAY_MS(10);
+  }
+}
+
 static void check_dfu_mode(void) {
   uint32_t const gpregret = NRF_POWER->GPREGRET;
 
@@ -313,8 +322,7 @@ static void check_dfu_mode(void) {
 
   // No valid app and a cable present: serve the UF2 drive instead of waiting for a phone.
   // Without a host the 3 s timeout below falls through to the OTA wait.
-  bool const vbus_present = (NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk) != 0;
-  if (!valid_app && !dfu_start && vbus_present) uf2_dfu = true;
+  if (!valid_app && !dfu_start && vbus_detected_settled()) uf2_dfu = true;
 
   if ((dfu_start || !valid_app) && !serial_only_dfu && !uf2_dfu && !double_reset) {
     _ota_dfu = true; // set default to OTA only when no explicit UF2/serial/dbl-reset
