@@ -72,6 +72,8 @@
 #ifdef NRF_USBD
 
 #include "uf2/uf2.h"
+#include "fault_record.h"
+#include "dfu_ble_svc.h"
 #include "nrf_usbd.h"
 #include "tusb.h"
 #include "app_timer.h"
@@ -498,7 +500,17 @@ static uint32_t ble_stack_init(void) {
 //--------------------------------------------------------------------+
 // Error Handler
 //--------------------------------------------------------------------+
+// The peer data and its CRC (dfu_ble_svc.c) occupy the first 0x40 bytes of NOINIT.
+STATIC_ASSERT(sizeof(dfu_ble_peer_data_t) + sizeof(uint16_t) <= 0x40);
+STATIC_ASSERT(FAULT_RECORD_ADDR + sizeof(fault_record_t) <= 0x20008000u);
+
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info) {
+  // For SDK errors info points at a stack error_info_t that will not survive the reset.
+  if (id == NRF_FAULT_ID_SDK_ERROR && info != 0) info = ((error_info_t const*) info)->err_code;
+  g_fault_record.id = id;
+  g_fault_record.pc = pc;
+  g_fault_record.info = info;
+  g_fault_record.magic = FAULT_RECORD_MAGIC;
   volatile uint32_t* ARM_CM_DHCSR = ((volatile uint32_t*) 0xE000EDF0UL); /* Cortex M CoreDebug->DHCSR */
   if ((*ARM_CM_DHCSR) & 1UL) __asm("BKPT #0\n"); /* Only halt mcu if debugger is attached */
   NVIC_SystemReset();
