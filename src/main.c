@@ -166,6 +166,15 @@ int main(void) {
   // TODO move to CF2
   BOOTLOADER_VERSION_REGISTER = (MK_BOOTLOADER_VERSION);
 
+  // 0xB1 claims the app jumped here with the SoftDevice already set up, but it
+  // also survives a reset (a lockup during the app's handover leaves exactly
+  // that). Restart on the 0xA8 path, which inits the SoftDevice itself and
+  // keeps the peer data in .noinit.
+  if (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM) {
+    NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET;
+    NVIC_SystemReset();
+  }
+
   board_init();
   bootloader_init();
   PRINTF("Bootloader Start\r\n");
