@@ -570,8 +570,11 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
         bootloader_settings_t const * boot_setting;
         bootloader_util_settings_get(&boot_setting);
 
+        // A size spanning the whole region is the CURRENT.UF2 full-region fallback, not a measured
+        // application end, so it is treated as unknown like current_flash_size() does.
         uint32_t const sz = boot_setting->bank_0_size;
         if ( boot_setting->bank_0 == BANK_VALID_APP && sz != 0 && sz != 0xFFFFFFFFUL &&
+             sz < USER_FLASH_END - DFU_BANK_0_REGION_START &&
              sz > BOOTLOADER_ADDR_NEW_RECIEVED - DFU_BANK_0_REGION_START )
         {
           dfu_update_status_t s = { .status_code = DFU_BANK_0_ERASED };
