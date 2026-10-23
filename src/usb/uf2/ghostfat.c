@@ -530,8 +530,8 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
        * - Along with bootloader code, UCIR (at 0x1000100) is also included containing
        * 0x10001014 (bootloader address), and 0x10001018 (MBR Params address).
        *
-       * Note: part of the existing application can be affected when updating bootloader.
-       * TODO May be worth to have some kind crc/application integrity checking
+       * Note: staging overwrites the application tail above BOOTLOADER_ADDR_NEW_RECIEVED, so an
+       * application that reaches it is invalidated before the first block is staged.
        *
        *                         -------------         -------------         -------------
        *                        |             |       |             |     + |     New     |
@@ -550,6 +550,21 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
        *                         -------------         -------------         -------------
        */
       PRINTF("addr = 0x%08lX, block = %ld (%ld of %ld)\r\n", bl->targetAddr, bl->blockNo, state->numWritten, bl->numBlocks);
+
+      if ( !state->update_bootloader )
+      {
+        bootloader_settings_t const * boot_setting;
+        bootloader_util_settings_get(&boot_setting);
+
+        uint32_t const sz = boot_setting->bank_0_size;
+        if ( boot_setting->bank_0 == BANK_VALID_APP && sz != 0 && sz != 0xFFFFFFFFUL &&
+             sz > BOOTLOADER_ADDR_NEW_RECIEVED - DFU_BANK_0_REGION_START )
+        {
+          dfu_update_status_t s = { .status_code = DFU_BANK_0_ERASED };
+          bootloader_dfu_update_process(s);
+          state->app_invalidated = true;
+        }
+      }
 
       state->update_bootloader = true;
       screen_set_title("BOOTLOADER");
