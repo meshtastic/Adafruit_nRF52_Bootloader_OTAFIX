@@ -60,6 +60,7 @@ typedef struct {
     bool boot_id_matches;     // if bootloader id in cf2 config matches our VID/PID
     bool factory_erase;       // if a CFG_UF2_MESHTASTIC_ERASE_ID block was received
     bool sd_start_seen;       // if the SoftDevice's first page (USER_FLASH_START) was received
+    bool wrong_layout;        // if this file was built for another SoftDevice layout
 
     uint8_t writtenMask[MAX_BLOCKS / 8 + 1];
 } WriteState;
