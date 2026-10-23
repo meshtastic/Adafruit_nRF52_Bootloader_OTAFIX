@@ -324,6 +324,8 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout
 {
   uint32_t err_code;
 
+  // A settings save earlier in this boot (SoftDevice finalize) leaves the status at COMPLETE, which would end this session before it starts.
+  m_update_status = BOOTLOADER_UPDATING;
   m_cancel_timeout_on_usb = cancel_timeout_on_usb && !ota;
 
   // Clear swap if banked update is used.
