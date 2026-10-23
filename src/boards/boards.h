@@ -138,6 +138,10 @@ bool board_display_init(void);
 void board_display_teardown(void);
 void screen_draw_drag(void);
 void screen_draw_ble(void);
+// Both redraw only once a screen is up. A title replaces the board name;
+// NULL restores it.
+void screen_set_title(char const* title);
+void screen_set_progress(uint32_t done, uint32_t total);
 
 #ifdef DISPLAY_MONO
 // One 8-row page, DISPLAY_WIDTH bytes, LSB = topmost row of the page.
@@ -145,6 +149,9 @@ void board_display_draw_page(uint8_t page, uint8_t const* buf, size_t nbytes);
 #else
 void board_display_draw_line(uint16_t y, uint8_t const* buf, size_t nbytes);
 #endif
+#else
+static inline void screen_set_title(char const* title) { (void) title; }
+static inline void screen_set_progress(uint32_t done, uint32_t total) { (void) done; (void) total; }
 #endif
 
 //--------------------------------------------------------------------+

@@ -287,8 +287,10 @@ static void print(int x, int y, int color, const char* text, int size) {
   }
 }
 
-static inline void print_centered(int y, int color, const char* text, int size) {
+// Steps the size down until the text fits the panel width.
+static void print_centered(int y, int color, const char* text, int size) {
   int len = (int) strlen(text);
+  while (size > 1 && TEXT_WIDTH(size, len) > DISPLAY_WIDTH) size--;
   int text_x = (DISPLAY_WIDTH - TEXT_WIDTH(size, len)) / 2;
   print(text_x >= 0 ? text_x : 0, y, color, text, size);
 }
@@ -303,11 +305,12 @@ static inline void print_centered(int y, int color, const char* text, int size) 
 // colors stay dark.
 #define MONO_LIT_MASK   ((1u << COLOR_WHITE) | (1u << COLOR_PURPLE))
 
-static void draw_screen(uint8_t const* fb) {
+// Sends only the pages covering rows y0..y1.
+static void draw_screen(uint8_t const* fb, int y0, int y1) {
   // SSD1306/SH1106 GDDRAM is paged: one byte spans 8 rows of a single
   // column, LSB topmost. frame_buf is already column-major, so each output
   // byte gathers 8 contiguous bytes of it.
-  for (int page = 0; page < DISPLAY_HEIGHT / 8; ++page) {
+  for (int page = y0 / 8; page <= y1 / 8; ++page) {
     uint8_t line[DISPLAY_WIDTH];
 
     for (int x = 0; x < DISPLAY_WIDTH; ++x) {
@@ -327,7 +330,10 @@ static void draw_screen(uint8_t const* fb) {
 
 #else
 
-static void draw_screen(uint8_t const* fb) {
+// Always sends the whole frame; lines are columns, so rows cannot be cropped.
+static void draw_screen(uint8_t const* fb, int y0, int y1) {
+  (void) y0;
+  (void) y1;
   uint8_t const* p = fb;
   for (int y = 0; y < DISPLAY_WIDTH; ++y) {
     uint8_t cc[DISPLAY_HEIGHT * 2];
@@ -345,7 +351,7 @@ static void draw_screen(uint8_t const* fb) {
 #endif
 
 // draw color bar
-static void drawBar(int y, int h, int color) {
+static void drawBar(int y, int h, int color, int w) {
   // The default bar geometry assumes a 240x135 panel.
   if (y < 0) {
     h += y;
@@ -358,22 +364,38 @@ static void drawBar(int y, int h, int color) {
     h = DISPLAY_HEIGHT - y;
   }
 
-  for (int x = 0; x < DISPLAY_WIDTH; ++x) {
+  for (int x = 0; x < w; ++x) {
     memset(frame_buf + x * DISPLAY_HEIGHT + y, color, h);
   }
 }
 
-// draw drag & drop screen
-void screen_draw_drag(void) {
-  drawBar(SCREEN_BAR1_Y, SCREEN_BAR1_H, COLOR_GREEN);
-  drawBar(SCREEN_BAR2_Y, SCREEN_BAR2_H, COLOR_BLUE);
-  drawBar(SCREEN_BAR3_Y, SCREEN_BAR3_H, COLOR_ORANGE);
+static char const* _title; // NULL shows DISPLAY_TITLE
+static int _pct = -1;
+static bool _ble;
+static bool _shown;
 
-  // Print title, version, banner.
-  print_centered(DISPLAY_TITLE_Y, COLOR_WHITE, DISPLAY_TITLE, FONT_SIZE_LARGE);
+#define ALL_ROWS  0, DISPLAY_HEIGHT - 1
+
+// Renders the whole frame and sends rows y0..y1 of it.
+static void draw(int y0, int y1) {
+  _shown = true;
+  drawBar(SCREEN_BAR1_Y, SCREEN_BAR1_H, COLOR_GREEN, DISPLAY_WIDTH);
+  drawBar(SCREEN_BAR2_Y, SCREEN_BAR2_H, COLOR_BLUE, DISPLAY_WIDTH);
+  drawBar(SCREEN_BAR3_Y, SCREEN_BAR3_H, COLOR_ORANGE, DISPLAY_WIDTH);
+
+  print_centered(DISPLAY_TITLE_Y, COLOR_WHITE, _title ? _title : DISPLAY_TITLE, FONT_SIZE_LARGE);
   print_centered(UF2_VERSION_BASE_Y, COLOR_PURPLE, UF2_VERSION_BASE, 1);
-  print_centered(BANNER_TEXT_Y, COLOR_WHITE, BANNER_TEXT, 1);
+  if (_pct < 0) {
+    print_centered(BANNER_TEXT_Y, COLOR_WHITE, BANNER_TEXT, 1);
+  } else {
+    // The banner line becomes the progress bar, over a full-width baseline.
+    drawBar(BANNER_TEXT_Y + 7, 1, COLOR_WHITE, DISPLAY_WIDTH);
+    drawBar(BANNER_TEXT_Y, 8, COLOR_WHITE, DISPLAY_WIDTH * _pct / 100);
+  }
 
+  if (_ble) {
+    print_centered(BLE_OTA_Y, COLOR_WHITE, "BLE OTA", FONT_SIZE_LARGE);
+  } else {
 #ifdef DISPLAY_NO_DRAG_ICONS
   print_centered(DRAG_TEXT_Y, COLOR_WHITE, DRAG_TEXT, FONT_SIZE_LARGE);
 #else
@@ -391,22 +413,34 @@ void screen_draw_drag(void) {
   print(160, DRAG - 12, COLOR_WHITE, UF2_VOLUME_LABEL, 1);
   #endif // NOLABELS
 #endif // DISPLAY_NO_DRAG_ICONS
+  }
 
-  draw_screen(frame_buf);
+  draw_screen(frame_buf, y0, y1);
+}
+
+void screen_draw_drag(void) {
+  _ble = false;
+  draw(ALL_ROWS);
 }
 
 void screen_draw_ble(void) {
-  drawBar(SCREEN_BAR1_Y, SCREEN_BAR1_H, COLOR_GREEN);
-  drawBar(SCREEN_BAR2_Y, SCREEN_BAR2_H, COLOR_BLUE);
-  drawBar(SCREEN_BAR3_Y, SCREEN_BAR3_H, COLOR_ORANGE);
+  _ble = true;
+  draw(ALL_ROWS);
+}
 
-  // Print title, version, OTA, banner
-  print_centered(DISPLAY_TITLE_Y, COLOR_WHITE, DISPLAY_TITLE, FONT_SIZE_LARGE);
-  print_centered(UF2_VERSION_BASE_Y, COLOR_PURPLE, UF2_VERSION_BASE, 1);
-  print_centered(BLE_OTA_Y, COLOR_WHITE, "BLE OTA", FONT_SIZE_LARGE);
-  print_centered(BANNER_TEXT_Y, COLOR_WHITE, BANNER_TEXT, 1);
+void screen_set_title(char const* title) {
+  if (title == _title) return;
+  _title = title;
+  if (_shown) draw(ALL_ROWS);
+}
 
-  draw_screen(frame_buf);
+// Redraws in 5% steps.
+void screen_set_progress(uint32_t done, uint32_t total) {
+  if (!_shown || total == 0 || total == 0xffffffff || done > total) return;
+  int pct = (int) (done * 100 / total);
+  if (_pct >= 0 && pct / 5 == _pct / 5) return;
+  _pct = pct;
+  draw(BANNER_TEXT_Y, BANNER_TEXT_Y + 7);
 }
 
 #endif

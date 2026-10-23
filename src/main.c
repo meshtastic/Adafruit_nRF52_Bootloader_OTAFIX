@@ -327,6 +327,7 @@ static void check_dfu_mode(void) {
 
   // Enter DFU mode accordingly to input
   if (dfu_start || !valid_app) {
+    if (!valid_app) screen_set_title("NO FIRMWARE");
     if (_ota_dfu) {
       #ifdef BOARD_HAS_DISPLAY
         if (board_display_init()) {
