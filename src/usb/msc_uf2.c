@@ -183,8 +183,8 @@ int32_t tud_msc_write10_cb (uint8_t lun, uint32_t lba, uint32_t offset, uint8_t*
   uint32_t count = 0;
   while ( count < bufsize )
   {
-    // Consider non-uf2 block write as successful
-    // only break if write_block is busy with flashing (return 0)
+    // Non-uf2 and rejected blocks count as consumed like good ones.
+    // The loop only stops early on a 0 return, which write_block never gives.
     if ( 0 == write_block(lba, buffer, &_wr_state) ) break;
 
     lba++;
