@@ -248,18 +248,9 @@ static void ota_vbus_timer_handler(void* p_context) {
   }
 }
 
-static void ota_vbus_watch_init(void) {
-  // A late-reading VBUSDETECT must not look like a plug: seed from a settled read, then enable events.
-  uint32_t usb_reg = 0;
-  _ota_vbus_was_low = true;
-  for (uint32_t waited_ms = 0; waited_ms < 500; waited_ms += 10) {
-    sd_power_usbregstatus_get(&usb_reg);
-    if (usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk) {
-      _ota_vbus_was_low = false;
-      break;
-    }
-    NRFX_DELAY_MS(10);
-  }
+// vbus_present must come from a settled read taken before the SoftDevice starts, so a late VBUSDETECT is not seen as a plug.
+static void ota_vbus_watch_init(bool vbus_present) {
+  _ota_vbus_was_low = !vbus_present;
   sd_power_usbdetected_enable(true);
   sd_power_usbremoved_enable(true);
   app_timer_create(&_ota_vbus_timer, APP_TIMER_MODE_SINGLE_SHOT, ota_vbus_timer_handler);
@@ -275,7 +266,7 @@ static void ota_vbus_event(uint32_t soc_evt) {
   }
 }
 #else
-#define ota_vbus_watch_init()
+#define ota_vbus_watch_init(vbus_present)
 #define ota_vbus_event(evt)
 #endif
 
@@ -374,7 +365,8 @@ static void check_dfu_mode(void) {
 
   // No valid app and a cable present: serve the UF2 drive instead of waiting for a phone.
   // Without a host the 3 s timeout below falls through to the OTA wait.
-  if (!valid_app && !dfu_start && vbus_detected_settled()) uf2_dfu = true;
+  bool const vbus_present = !valid_app && vbus_detected_settled();
+  if (vbus_present && !dfu_start) uf2_dfu = true;
 
   if ((dfu_start || !valid_app) && !serial_only_dfu && !uf2_dfu && !double_reset) {
     _ota_dfu = true; // set default to OTA only when no explicit UF2/serial/dbl-reset
@@ -393,7 +385,7 @@ static void check_dfu_mode(void) {
       mbr_init_sd();
       _sd_inited = true;
       ble_stack_init();
-      ota_vbus_watch_init();
+      ota_vbus_watch_init(vbus_present);
     } else {
       led_state(STATE_USB_UNMOUNTED);
       usb_init(serial_only_dfu);
