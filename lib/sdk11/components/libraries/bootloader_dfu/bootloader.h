@@ -77,10 +77,6 @@ void bootloader_dfu_update_process(dfu_update_status_t update_status);
  */
 bool bootloader_dfu_sd_in_progress(void);
 
-/**@brief Function for checking whether a completed update is still being written to the bootloader settings.
- */
-bool bootloader_dfu_settings_saving(void);
-
 /**@brief Function for continuing the Device Firmware Update of a SoftDevice.
  * 
  * @retval     NRF_SUCCESS If the final stage of SoftDevice update was successful. 
