@@ -9,6 +9,7 @@ it and is upstream Adafruit history, kept for provenance.
 - Fixed an out-of-bounds write in `printicon()` on the 160x80 `heltec_t096` and `heltec_t1`, where the third drag icon ran past the end of `frame_buf`. Those boards place it inside the panel, and `printicon()` skips any icon that would land outside.
 - Fixed BLE OTA started from an application's buttonless DFU falling back to the application after about 10 s. The 0xB1 entry now restarts through the 0xA8 path, so the bootloader initializes the SoftDevice itself; the peer data for reconnection survives the reset.
 - The DFU screen shows upload progress during UF2, serial, and BLE transfers, as a bar in place of the banner. The title reads BOOTLOADER during a bootloader update, ERASE during a factory erase, WRONG FILE for a UF2 this board cannot take, and NO FIRMWARE when DFU starts without a valid application.
+- The lazy-erase packet buffer holds 16 packets instead of 8. Costs about 2 KB of `.bss`.
 
 ## OTAFIX 2.5
 
