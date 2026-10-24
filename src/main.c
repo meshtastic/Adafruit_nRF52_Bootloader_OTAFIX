@@ -240,8 +240,7 @@ static void ota_vbus_timer_handler(void* p_context) {
   (void) p_context;
   uint32_t usb_reg = 0;
   sd_power_usbregstatus_get(&usb_reg);
-  if ((usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk) && !_ota_connected && !bootloader_app_is_valid() &&
-      !bootloader_dfu_settings_saving()) {
+  if ((usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk) && !_ota_connected && !bootloader_app_is_valid()) {
     _ota_cable_exit = true;
     dfu_update_status_t update_status = { .status_code = DFU_RESET };
     bootloader_dfu_update_process(update_status);

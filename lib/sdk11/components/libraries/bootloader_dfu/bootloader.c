@@ -298,7 +298,8 @@ void bootloader_dfu_update_process(dfu_update_status_t update_status)
   }
   else if (update_status.status_code == DFU_RESET)
   {
-    m_update_status = BOOTLOADER_RESET;
+    // A completed image is still being saved: let the store callback finish it.
+    if (m_update_status != BOOTLOADER_SETTINGS_SAVING) m_update_status = BOOTLOADER_RESET;
   }
   else
   {
@@ -404,12 +405,6 @@ void bootloader_app_start(void)
 
   // jump to app
   bootloader_util_app_start(app_addr);
-}
-
-
-bool bootloader_dfu_settings_saving(void)
-{
-  return m_update_status == BOOTLOADER_SETTINGS_SAVING;
 }
 
 
