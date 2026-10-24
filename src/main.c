@@ -240,7 +240,8 @@ static void ota_vbus_timer_handler(void* p_context) {
   (void) p_context;
   uint32_t usb_reg = 0;
   sd_power_usbregstatus_get(&usb_reg);
-  if ((usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk) && !_ota_connected && !bootloader_app_is_valid()) {
+  if ((usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk) && !_ota_connected && !bootloader_app_is_valid() &&
+      !bootloader_dfu_settings_saving()) {
     _ota_cable_exit = true;
     dfu_update_status_t update_status = { .status_code = DFU_RESET };
     bootloader_dfu_update_process(update_status);
@@ -248,11 +249,19 @@ static void ota_vbus_timer_handler(void* p_context) {
 }
 
 static void ota_vbus_watch_init(void) {
+  // A late-reading VBUSDETECT must not look like a plug: seed from a settled read, then enable events.
   uint32_t usb_reg = 0;
+  _ota_vbus_was_low = true;
+  for (uint32_t waited_ms = 0; waited_ms < 500; waited_ms += 10) {
+    sd_power_usbregstatus_get(&usb_reg);
+    if (usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk) {
+      _ota_vbus_was_low = false;
+      break;
+    }
+    NRFX_DELAY_MS(10);
+  }
   sd_power_usbdetected_enable(true);
   sd_power_usbremoved_enable(true);
-  sd_power_usbregstatus_get(&usb_reg);
-  _ota_vbus_was_low = !(usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk);
   app_timer_create(&_ota_vbus_timer, APP_TIMER_MODE_SINGLE_SHOT, ota_vbus_timer_handler);
 }
 
