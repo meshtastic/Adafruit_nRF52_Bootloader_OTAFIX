@@ -756,6 +756,11 @@ uint32_t pstorage_store(pstorage_handle_t * p_dest,
         {
             return NRF_ERROR_NO_MEM;
         }
+        // flash_access is true only while the SoftDevice holds our request, so an idle queue with elements was never issued.
+        if (!m_cmd_queue.flash_access && m_cmd_queue.count > 0)
+        {
+            cmd_queue_dequeue();
+        }
         return NRF_SUCCESS;
     }
 
