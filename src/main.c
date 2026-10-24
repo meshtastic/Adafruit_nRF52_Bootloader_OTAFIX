@@ -264,9 +264,20 @@ static void ota_vbus_event(uint32_t soc_evt) {
     app_timer_start(_ota_vbus_timer, APP_TIMER_TICKS(OTA_VBUS_DEBOUNCE_MS), NULL);
   }
 }
+
+// A DETECTED event during a connection is dropped, so look again once the central leaves.
+static void ota_vbus_recheck(void) {
+  uint32_t usb_reg = 0;
+  sd_power_usbregstatus_get(&usb_reg);
+  if (_ota_vbus_was_low && (usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk)) {
+    app_timer_stop(_ota_vbus_timer);
+    app_timer_start(_ota_vbus_timer, APP_TIMER_TICKS(OTA_VBUS_DEBOUNCE_MS), NULL);
+  }
+}
 #else
 #define ota_vbus_watch_init(vbus_present)
 #define ota_vbus_event(evt)
+#define ota_vbus_recheck()
 #endif
 
 static void check_dfu_mode(void) {
@@ -517,6 +528,7 @@ uint32_t proc_ble(void) {
       case BLE_GAP_EVT_DISCONNECTED:
         _ota_connected = false;
         led_state(STATE_BLE_DISCONNECTED);
+        ota_vbus_recheck();
         break;
 
       default:
