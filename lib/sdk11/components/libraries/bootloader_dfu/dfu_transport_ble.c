@@ -34,11 +34,7 @@
 #include "dfu_ble_svc_internal.h"
 #include "nrf_delay.h"
 #include "sdk_common.h"
-
-
-#define BLEGAP_EVENT_LENGTH             6
-#define BLEGATT_ATT_MTU_MAX             247
-enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
+#include "ble_dfu_cfg.h"
 
 #define DFU_REV_MAJOR                        0x00                                                    /** DFU Major revision number to be exposed. */
 #define DFU_REV_MINOR                        0x08                                                    /** DFU Minor revision number to be exposed. */

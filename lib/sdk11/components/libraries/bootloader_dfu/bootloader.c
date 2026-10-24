@@ -115,6 +115,8 @@ static void wait_for_events(void)
 //    uint32_t err_code = sd_app_evt_wait();
 //    APP_ERROR_CHECK(err_code);
 
+    // Firmware arms a 90 s watchdog that survives the soft reset into the bootloader;
+    // every path outside this loop must stay under it.
     // Feed all Watchdog just in case application enable it
     // WDT cannot be disabled once started. It even last through NVIC soft reset
     if ( nrf_wdt_started_check(NRF_WDT) )
