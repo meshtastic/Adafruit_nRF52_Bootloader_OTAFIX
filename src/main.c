@@ -260,7 +260,7 @@ static void ota_vbus_event(uint32_t soc_evt) {
   if (soc_evt == NRF_EVT_POWER_USB_REMOVED) {
     _ota_vbus_was_low = true;
     app_timer_stop(_ota_vbus_timer);
-  } else if (soc_evt == NRF_EVT_POWER_USB_DETECTED && _ota_vbus_was_low && !_ota_connected && !bootloader_app_is_valid()) {
+  } else if (soc_evt == NRF_EVT_POWER_USB_DETECTED && _ota_vbus_was_low && !_ota_connected) {
     app_timer_stop(_ota_vbus_timer);
     app_timer_start(_ota_vbus_timer, APP_TIMER_TICKS(OTA_VBUS_DEBOUNCE_MS), NULL);
   }
