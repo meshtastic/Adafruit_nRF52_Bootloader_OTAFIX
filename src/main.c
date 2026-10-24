@@ -74,10 +74,12 @@
 #include "uf2/uf2.h"
 #include "nrf_usbd.h"
 #include "tusb.h"
+#include "app_timer.h"
 
 void usb_init(bool cdc_only);
 void usb_teardown(void);
 bool msc_factory_erase_pending(void);
+bool usb_host_mounted(void);
 
 // tinyusb function that handles power event (detected, ready, removed)
 // We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled.
@@ -87,6 +89,7 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 #define usb_init(x)       led_state(STATE_USB_MOUNTED) // mark nrf52832 as mounted
 #define usb_teardown()
 #define msc_factory_erase_pending() false
+#define usb_host_mounted() false
 
 #endif
 
@@ -130,6 +133,8 @@ uint32_t* dbl_reset_mem = ((uint32_t*) DFU_DBL_RESET_MEM);
 // true if ble, false if serial
 bool _ota_dfu = false;
 bool _ota_connected = false;
+// Set when the OTA wait ends because a cable arrived, so main resets plain into the drive.
+static bool _ota_cable_exit = false;
 // Set after the OTA session so the app jump does not init the SoftDevice twice.
 bool _sd_inited = false;
 
@@ -211,9 +216,58 @@ int main(void) {
     bootloader_app_start();
   }
 
-  NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET; // No application was loaded, reset the system with the OTA DFU update
+  // Host present: reset plain so the cabled gate returns to the drive. No host: OTA wait.
+  NRF_POWER->GPREGRET = (usb_host_mounted() || _ota_cable_exit) ? 0 : DFU_MAGIC_OTA_RESET;
   NVIC_SystemReset();
 }
+
+// VBUSDETECT can read 0 for a short time after a reset that followed usb_teardown().
+static bool vbus_detected_settled(void) {
+  for (uint32_t waited_ms = 0;; waited_ms += 10) {
+    if (NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk) return true;
+    if (waited_ms >= 500) return false;
+    NRFX_DELAY_MS(10);
+  }
+}
+
+#ifdef NRF_USBD
+// No app, nothing connected, VBUS 0 -> 1 held 250 ms in the OTA wait: leave it so the cabled gate runs.
+#define OTA_VBUS_DEBOUNCE_MS 250
+APP_TIMER_DEF(_ota_vbus_timer);
+static bool _ota_vbus_was_low;
+
+static void ota_vbus_timer_handler(void* p_context) {
+  (void) p_context;
+  uint32_t usb_reg = 0;
+  sd_power_usbregstatus_get(&usb_reg);
+  if ((usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk) && !_ota_connected && !bootloader_app_is_valid()) {
+    _ota_cable_exit = true;
+    dfu_update_status_t update_status = { .status_code = DFU_RESET };
+    bootloader_dfu_update_process(update_status);
+  }
+}
+
+// vbus_present must come from a settled read taken before the SoftDevice starts, so a late VBUSDETECT is not seen as a plug.
+static void ota_vbus_watch_init(bool vbus_present) {
+  _ota_vbus_was_low = !vbus_present;
+  sd_power_usbdetected_enable(true);
+  sd_power_usbremoved_enable(true);
+  app_timer_create(&_ota_vbus_timer, APP_TIMER_MODE_SINGLE_SHOT, ota_vbus_timer_handler);
+}
+
+static void ota_vbus_event(uint32_t soc_evt) {
+  if (soc_evt == NRF_EVT_POWER_USB_REMOVED) {
+    _ota_vbus_was_low = true;
+    app_timer_stop(_ota_vbus_timer);
+  } else if (soc_evt == NRF_EVT_POWER_USB_DETECTED && _ota_vbus_was_low && !_ota_connected) {
+    app_timer_stop(_ota_vbus_timer);
+    app_timer_start(_ota_vbus_timer, APP_TIMER_TICKS(OTA_VBUS_DEBOUNCE_MS), NULL);
+  }
+}
+#else
+#define ota_vbus_watch_init(vbus_present)
+#define ota_vbus_event(evt)
+#endif
 
 static void check_dfu_mode(void) {
   uint32_t const gpregret = NRF_POWER->GPREGRET;
@@ -308,6 +362,11 @@ static void check_dfu_mode(void) {
     (*dbl_reset_mem) = 0;
   }
 
+  // No valid app and a cable present: serve the UF2 drive instead of waiting for a phone.
+  // Without a host the 3 s timeout below falls through to the OTA wait.
+  bool const vbus_present = !valid_app && vbus_detected_settled();
+  if (vbus_present && !dfu_start) uf2_dfu = true;
+
   if ((dfu_start || !valid_app) && !serial_only_dfu && !uf2_dfu && !double_reset) {
     _ota_dfu = true; // set default to OTA only when no explicit UF2/serial/dbl-reset
   }
@@ -325,6 +384,7 @@ static void check_dfu_mode(void) {
       mbr_init_sd();
       _sd_inited = true;
       ble_stack_init();
+      ota_vbus_watch_init(vbus_present);
     } else {
       led_state(STATE_USB_UNMOUNTED);
       usb_init(serial_only_dfu);
@@ -478,6 +538,12 @@ uint32_t proc_soc(void) {
 
   if (NRF_SUCCESS == err) {
     pstorage_sys_event_handler(soc_evt);
+
+    // USB is not inited in the OTA wait; its power events only feed the cable watch.
+    if (_ota_dfu) {
+      ota_vbus_event(soc_evt);
+      return err;
+    }
 
 #ifdef NRF_USBD
     /*------------- usb power event handler -------------*/

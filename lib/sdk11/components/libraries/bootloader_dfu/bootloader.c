@@ -298,7 +298,8 @@ void bootloader_dfu_update_process(dfu_update_status_t update_status)
   }
   else if (update_status.status_code == DFU_RESET)
   {
-    m_update_status = BOOTLOADER_RESET;
+    // A completed image is still being saved: let the store callback finish it.
+    if (m_update_status != BOOTLOADER_SETTINGS_SAVING) m_update_status = BOOTLOADER_RESET;
   }
   else
   {
@@ -326,6 +327,8 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout
 {
   uint32_t err_code;
 
+  // A settings save earlier in this boot (SoftDevice finalize) leaves the status at COMPLETE, which would end this session before it starts.
+  m_update_status = BOOTLOADER_UPDATING;
   m_cancel_timeout_on_usb = cancel_timeout_on_usb && !ota;
 
   // Clear swap if banked update is used.
