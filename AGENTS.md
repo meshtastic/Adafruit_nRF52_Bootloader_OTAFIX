@@ -193,5 +193,8 @@ itself; a human has to edit it too.
   reports "Device programmed", a board on a USB host comes up as a UF2 drive
   showing NO FIRMWARE; drag the app's `.uf2` across. On battery it falls into
   the BLE-OTA wait after 3 s (USB-silent), and unplugging the cable while the
-  drive is up does the same: double-press reset for the drive, or complete a
-  BLE OTA DFU.
+  drive is up does the same. Plugging a cable into a no-app board that is
+  waiting for BLE, with no phone connected, brings the drive up (VBUS 0 to 1
+  during the wait, held 250 ms; `ota_vbus_event` in `main.c`). A cable already
+  present when the wait began does not: double-press reset for the drive, or
+  complete a BLE OTA DFU.
