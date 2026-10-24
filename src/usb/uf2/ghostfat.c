@@ -36,6 +36,7 @@
 #include "bootloader_settings.h"
 #include "bootloader.h"
 #include "boards.h"
+#include "fault_record.h"
 
 //--------------------------------------------------------------------+
 //
@@ -133,9 +134,9 @@ STATIC_ASSERT(FAT_ENTRIES_PER_SECTOR                       ==       256); // FAT
     "Factory-Erase: UF2 family 0x4D455348\r\n"
 
 char infoUf2File[128*3] = INFO_UF2_TEXT;
-// uf2_init() appends "SoftDevice: S140 7.3.0\r\n" at runtime; 40 covers the
-// widest values the id/version fields can print
-STATIC_ASSERT(sizeof(INFO_UF2_TEXT) + 40 <= sizeof(infoUf2File));
+// uf2_init() appends "SoftDevice: S140 7.3.0\r\n" (40 covers the widest id/version
+// fields) and "Last-Fault: id=0x<8> pc=0x<8> info=0x<8>\r\n" (57 bytes)
+STATIC_ASSERT(sizeof(INFO_UF2_TEXT) + 40 + 57 <= sizeof(infoUf2File));
 
 const char indexFile[] =
     "<!doctype html>\n"
@@ -342,6 +343,22 @@ void uf2_init(void)
   }else
   {
     strcat(infoUf2File, "not found\r\n");
+  }
+
+  if (g_fault_record.magic == FAULT_RECORD_MAGIC)
+  {
+    char str[10];
+    strcat(infoUf2File, "Last-Fault: id=0x");
+    utoa(g_fault_record.id, str, 16);
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, " pc=0x");
+    utoa(g_fault_record.pc, str, 16);
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, " info=0x");
+    utoa(g_fault_record.info, str, 16);
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, "\r\n");
+    g_fault_record.magic = 0;
   }
 }
 
