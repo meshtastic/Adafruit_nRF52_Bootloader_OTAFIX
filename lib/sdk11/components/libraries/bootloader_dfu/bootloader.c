@@ -407,6 +407,12 @@ void bootloader_app_start(void)
 }
 
 
+bool bootloader_dfu_settings_saving(void)
+{
+  return m_update_status == BOOTLOADER_SETTINGS_SAVING;
+}
+
+
 bool bootloader_dfu_sd_in_progress(void)
 {
   bootloader_settings_t const * p_bootloader_settings;
