@@ -503,6 +503,12 @@ void pstorage_sys_event_handler(uint32_t sys_evt)
 {  
     uint32_t retval = NRF_SUCCESS;
 
+    // Only flash completions may clear flash_access; any other SoC event would drop the pending one.
+    if (sys_evt != NRF_EVT_FLASH_OPERATION_SUCCESS && sys_evt != NRF_EVT_FLASH_OPERATION_ERROR)
+    {
+        return;
+    }
+
     // The event shall only be processed if requested by this module.
     if (m_cmd_queue.flash_access == true)
     {
