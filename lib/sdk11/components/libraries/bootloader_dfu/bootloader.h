@@ -90,8 +90,6 @@ uint32_t bootloader_dfu_sd_update_continue(void);
 uint32_t bootloader_dfu_sd_update_finalize(void);
 
 
-void bootloader_mbr_addrs_populate(void);
-
 #endif // BOOTLOADER_H__
 
 /**@} */

@@ -62,6 +62,7 @@
 #include "nrf_error.h"
 
 #include "boards.h"
+#include "ble_dfu_cfg.h"
 
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"
@@ -121,13 +122,6 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 // DFU_DBL_RESET magic is used to determined which mode is entered
 #define APP_ASKS_FOR_SINGLE_TAP_RESET() (*((uint32_t*)(DFU_BANK_0_REGION_START + 0x200)) == 0x87eeb07c)
 
-// These values must match the values in dfu_transport_ble.c and MAX_DFU_PKT_LEN should match BLEGATT_ATT_MTU_MAX - 3
-#define BLEGAP_EVENT_LENGTH             6
-#define BLEGATT_ATT_MTU_MAX             247
-enum {
-  BLE_CONN_CFG_HIGH_BANDWIDTH = 1
-};
-
 //--------------------------------------------------------------------+
 //
 //--------------------------------------------------------------------+
@@ -136,6 +130,7 @@ uint32_t* dbl_reset_mem = ((uint32_t*) DFU_DBL_RESET_MEM);
 // true if ble, false if serial
 bool _ota_dfu = false;
 bool _ota_connected = false;
+// Set when the OTA session initializes the SoftDevice, so the app jump does not initialize it twice.
 bool _sd_inited = false;
 
 bool is_ota(void) {
@@ -157,11 +152,6 @@ static void mbr_init_sd(void) {
 //
 //--------------------------------------------------------------------+
 int main(void) {
-  // Populate Boot Address and MBR Param into MBR if not already
-  // MBR_BOOTLOADER_ADDR/MBR_PARAM_PAGE_ADDR are used if available, else UICR registers are used
-  // Note: skip it for now since this will prevent us to change the size of bootloader in the future
-  // bootloader_mbr_addrs_populate();
-
   // Save bootloader version to pre-defined register, retrieved by application
   // TODO move to CF2
   BOOTLOADER_VERSION_REGISTER = (MK_BOOTLOADER_VERSION);
@@ -227,9 +217,6 @@ int main(void) {
 
 static void check_dfu_mode(void) {
   uint32_t const gpregret = NRF_POWER->GPREGRET;
-
-  // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
-  _sd_inited = (gpregret == DFU_MAGIC_OTA_APPJUM);
 
   // Start Bootloader in BLE OTA mode
   _ota_dfu = (gpregret == DFU_MAGIC_OTA_APPJUM) || (gpregret == DFU_MAGIC_OTA_RESET);
@@ -335,7 +322,7 @@ static void check_dfu_mode(void) {
         }
       #endif
       led_state(STATE_BLE_DISCONNECTED);
-      if (!_sd_inited) mbr_init_sd();
+      mbr_init_sd();
       _sd_inited = true;
       ble_stack_init();
     } else {
