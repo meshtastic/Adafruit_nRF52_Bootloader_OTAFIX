@@ -48,7 +48,7 @@
 #endif
 
 #define PENDING_PACKET_SIZE         256     /**<  Maximum size of a single pending packet data buffer. */
-#define PENDING_PACKET_COUNT        8       /**<  Maximum number of packets that can be buffered during lazy erase. */
+#define PENDING_PACKET_COUNT        16      /**<  Packets buffered during lazy erase; must exceed the largest client PRN interval (Android 10, Apple 8). */
 
 uint8_t  * dfu_page_erased;                                           /**< Pointer to page erased status array, set by DFU layer. */
 uint32_t   dfu_image_page_count;                                      /**< Number of pages in DFU image, set by DFU layer. */
