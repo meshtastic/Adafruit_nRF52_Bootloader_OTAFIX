@@ -221,6 +221,7 @@ int main(void) {
   NVIC_SystemReset();
 }
 
+#ifdef NRF_USBD
 // VBUSDETECT can read 0 for a short time after a reset that followed usb_teardown().
 static bool vbus_detected_settled(void) {
   for (uint32_t waited_ms = 0;; waited_ms += 10) {
@@ -229,6 +230,10 @@ static bool vbus_detected_settled(void) {
     NRFX_DELAY_MS(10);
   }
 }
+#else
+// No USB peripheral (nRF52832): never take the cabled gate.
+#define vbus_detected_settled() false
+#endif
 
 #ifdef NRF_USBD
 // No app, nothing connected, VBUS 0 -> 1 held 250 ms in the OTA wait: leave it so the cabled gate runs.
