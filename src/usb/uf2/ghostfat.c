@@ -495,16 +495,17 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
        *                         |     MBR     |       |     MBR     |
        *                          -------------         -------------
        */
+      // An image carrying a SoftDevice starts at or below its first page; an app-only image must
+      // start exactly at the app start. One built for another SoftDevice starts above or below it,
+      // so every block of that file is rejected and nothing is written. Block 0 opens a new file
+      // whatever its address (an MBR block at 0x0 included). Assumes the host writes front to back.
+      if ( bl->blockNo == 0 )
+      {
+        state->sd_start_seen = false;
+        state->wrong_layout = (bl->targetAddr > DFU_BANK_0_REGION_START);
+      }
       if ( in_app_space(bl->targetAddr) )
       {
-        // An image carrying a SoftDevice starts at its first page. An app-only image aimed below
-        // the app start was built for another SoftDevice, so every block of that file is rejected
-        // and nothing is written. Assumes the host writes the file front to back.
-        if ( bl->blockNo == 0 )
-        {
-          state->sd_start_seen = false;
-          state->wrong_layout = false;
-        }
         if ( bl->targetAddr == USER_FLASH_START ) state->sd_start_seen = true;
         if ( !state->sd_start_seen && bl->targetAddr < DFU_BANK_0_REGION_START ) state->wrong_layout = true;
         if ( state->wrong_layout ) goto reject;
