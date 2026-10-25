@@ -130,7 +130,7 @@ uint32_t* dbl_reset_mem = ((uint32_t*) DFU_DBL_RESET_MEM);
 // true if ble, false if serial
 bool _ota_dfu = false;
 bool _ota_connected = false;
-// Set after the OTA session so the app jump does not init the SoftDevice twice.
+// Set when the OTA session initializes the SoftDevice, so the app jump does not initialize it twice.
 bool _sd_inited = false;
 
 bool is_ota(void) {

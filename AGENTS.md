@@ -150,10 +150,7 @@ itself; a human has to edit it too.
 
 - **ARM GCC version matters.** CI pins exactly `12.3.Rel1`; 13.3.Rel1 also
   compiles clean and is the closest verified-working version if you can't
-  get the exact CI-pinned one. GCC 15 is unverified here; Adafruit's scoped
-  `#pragma GCC diagnostic` for its `-Werror=array-bounds` false positive in
-  `lib/sdk11/components/libraries/bootloader_dfu/bootloader_settings.c`
-  (a fixed MBR-address read) is in.
+  get the exact CI-pinned one. GCC 15 is unverified here.
 - **MeshCore/Ripple content has been deliberately removed** from the docs
   (README, changelog) — this is Meshtastic's own branded fork now, not a
   place to re-add other companion-firmware documentation. If you're
