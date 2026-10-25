@@ -74,8 +74,8 @@ The `Makefile` takes the board from `BOARD`: it includes
 `src/boards/$(BOARD)/board.mk`, puts `src/boards/$(BOARD)` on the include path
 for `board.h`, and compiles `pinconfig.c` on every MCU but the nRF52832. Other sources are
 listed explicitly, so a new file in a board directory is not compiled until the
-`Makefile` names it. There is no separate board list to keep in sync (unlike
-the CI matrix, see below).
+`Makefile` names it. There is no separate board list to keep in sync here;
+the one hand-kept list is branch protection's required checks (see CI below).
 
 ### Core bootloader (`src/`)
 
