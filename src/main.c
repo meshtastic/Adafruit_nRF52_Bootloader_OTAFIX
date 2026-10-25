@@ -68,12 +68,12 @@
 #include "nrf_mbr.h"
 #include "pstorage.h"
 #include "nrfx_nvmc.h"
+#include "fault_record.h"
+#include "dfu_ble_svc.h"
 
 #ifdef NRF_USBD
 
 #include "uf2/uf2.h"
-#include "fault_record.h"
-#include "dfu_ble_svc.h"
 #include "nrf_usbd.h"
 #include "tusb.h"
 #include "app_timer.h"
@@ -452,8 +452,8 @@ static uint32_t ble_stack_init(void) {
   sd_nvic_EnableIRQ(SD_EVT_IRQn);
 
   /*------------- Configure BLE params  -------------*/
-  extern uint32_t __data_start__[]; // defined in linker
-  uint32_t ram_start = (uint32_t) __data_start__;
+  extern uint32_t __sd_ram_end__[]; // defined in linker: the SoftDevice owns RAM below it
+  uint32_t ram_start = (uint32_t) __sd_ram_end__;
 
   ble_cfg_t blecfg;
 
@@ -502,7 +502,8 @@ static uint32_t ble_stack_init(void) {
 //--------------------------------------------------------------------+
 // The peer data and its CRC (dfu_ble_svc.c) occupy the first 0x40 bytes of NOINIT.
 STATIC_ASSERT(sizeof(dfu_ble_peer_data_t) + sizeof(uint16_t) <= 0x40);
-STATIC_ASSERT(FAULT_RECORD_ADDR + sizeof(fault_record_t) <= 0x20008000u);
+STATIC_ASSERT(sizeof(fault_record_t) <= 0x10);
+fault_record_t g_fault_record __attribute__((section(".fault_record")));
 
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info) {
   // For SDK errors info points at a stack error_info_t that will not survive the reset.

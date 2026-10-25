@@ -10,10 +10,8 @@ typedef struct {
   uint32_t magic, id, pc, info;
 } fault_record_t;
 
-// Second half of the linker's 0x80-byte NOINIT region at 0x20007F80; the first
-// half holds the BLE peer data. Placed by address because a second .noinit input
-// section from another object file is not merged into the NOINIT output section.
-#define FAULT_RECORD_ADDR 0x20007FC0u
-#define g_fault_record (*(fault_record_t*) FAULT_RECORD_ADDR)
+// Lives in the linker's 16-byte FAULT_RECORD region at the start of bootloader
+// RAM: above the SoftDevice RAM, outside .data and .bss, so reset leaves it alone.
+extern fault_record_t g_fault_record;
 
 #endif

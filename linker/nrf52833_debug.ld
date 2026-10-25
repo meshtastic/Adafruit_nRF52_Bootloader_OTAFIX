@@ -26,7 +26,10 @@ MEMORY
   
   /** RAM Region for bootloader. */
   /* Avoid conflict with NOINIT for OTA bond sharing */
-  RAM (rwx) :  ORIGIN = 0x20008000, LENGTH = 0x20020000-0x20008000
+  RAM (rwx) :  ORIGIN = 0x20008010, LENGTH = 0x20020000-0x20008010
+
+  /* Written by the fault handler and read after the next reset; above the SoftDevice RAM, outside .data and .bss. */
+  FAULT_RECORD (rwx) : ORIGIN = 0x20008000, LENGTH = 0x10
 
   /* Location for double reset detection, no init */
   DBL_RESET (rwx) :  ORIGIN = 0x20007F7C, LENGTH = 0x04
@@ -92,6 +95,13 @@ SECTIONS
   {
 
   } > NOINIT
+
+  .fault_record (NOLOAD) :
+  {
+    KEEP(*(.fault_record))
+  } > FAULT_RECORD
+
+  __sd_ram_end__ = ORIGIN(FAULT_RECORD);
 
   /* other placements follow here... */
 }
