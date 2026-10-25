@@ -216,7 +216,7 @@ int main(void) {
     bootloader_app_start();
   }
 
-  // Host present: reset plain so the cabled gate returns to the drive. No host: OTA wait.
+  // A host mounted the drive this session or a cable arrived in the BLE wait: reset plain and let the gate decide. Otherwise the OTA wait.
   NRF_POWER->GPREGRET = (usb_host_mounted() || _ota_cable_exit) ? 0 : DFU_MAGIC_OTA_RESET;
   NVIC_SystemReset();
 }
@@ -252,12 +252,23 @@ static void ota_vbus_timer_handler(void* p_context) {
   }
 }
 
+// A DETECTED event during a connection is dropped, so look again once the central leaves.
+static void ota_vbus_recheck(void) {
+  uint32_t usb_reg = 0;
+  sd_power_usbregstatus_get(&usb_reg);
+  if (_ota_vbus_was_low && (usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk)) {
+    app_timer_stop(_ota_vbus_timer);
+    app_timer_start(_ota_vbus_timer, APP_TIMER_TICKS(OTA_VBUS_DEBOUNCE_MS), NULL);
+  }
+}
+
 // vbus_present must come from a settled read taken before the SoftDevice starts, so a late VBUSDETECT is not seen as a plug.
 static void ota_vbus_watch_init(bool vbus_present) {
   _ota_vbus_was_low = !vbus_present;
   sd_power_usbdetected_enable(true);
   sd_power_usbremoved_enable(true);
   app_timer_create(&_ota_vbus_timer, APP_TIMER_MODE_SINGLE_SHOT, ota_vbus_timer_handler);
+  ota_vbus_recheck(); // catches a cable plugged in after the settled read
 }
 
 static void ota_vbus_event(uint32_t soc_evt) {
@@ -265,16 +276,6 @@ static void ota_vbus_event(uint32_t soc_evt) {
     _ota_vbus_was_low = true;
     app_timer_stop(_ota_vbus_timer);
   } else if (soc_evt == NRF_EVT_POWER_USB_DETECTED && _ota_vbus_was_low && !_ota_connected) {
-    app_timer_stop(_ota_vbus_timer);
-    app_timer_start(_ota_vbus_timer, APP_TIMER_TICKS(OTA_VBUS_DEBOUNCE_MS), NULL);
-  }
-}
-
-// A DETECTED event during a connection is dropped, so look again once the central leaves.
-static void ota_vbus_recheck(void) {
-  uint32_t usb_reg = 0;
-  sd_power_usbregstatus_get(&usb_reg);
-  if (_ota_vbus_was_low && (usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk)) {
     app_timer_stop(_ota_vbus_timer);
     app_timer_start(_ota_vbus_timer, APP_TIMER_TICKS(OTA_VBUS_DEBOUNCE_MS), NULL);
   }
@@ -380,7 +381,8 @@ static void check_dfu_mode(void) {
 
   // No valid app and a cable present: serve the UF2 drive instead of waiting for a phone.
   // Without a host the 3 s timeout below falls through to the OTA wait.
-  bool const vbus_present = !valid_app && vbus_detected_settled();
+  // An OTA entry with a valid app takes the settled read too, only to seed the cable watch.
+  bool const vbus_present = (!valid_app || _ota_dfu) && vbus_detected_settled();
   if (vbus_present && !dfu_start) uf2_dfu = true;
 
   if ((dfu_start || !valid_app) && !serial_only_dfu && !uf2_dfu && !double_reset) {
