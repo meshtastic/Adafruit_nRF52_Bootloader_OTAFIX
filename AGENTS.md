@@ -31,8 +31,7 @@ can upgrade in-app over USB/serial (`feature/firmware` there).
 Meshtastic's separate `Adafruit_nRF52_Bootloader` fork is a **different
 lineage without** the OTAFIX patches — don't confuse the two.
 
-This is C, built with a bare Makefile (the supported path) or `CMakeLists.txt`
-(**not** fully wired — see the CMake gotcha below). Not PlatformIO.
+This is C, built with a bare Makefile. Not PlatformIO.
 
 ## Build
 
@@ -69,16 +68,14 @@ Each board directory can carry:
   `src/screen.c`.
 - `board.mk` — Makefile board config (`MCU_SUB_VARIANT`, per-board
   `CFLAGS` like the BLE `DEVICE_NAME`).
-- `board.cmake` — **only exists for 5 of 19 boards** (`heltec_t096`,
-  `heltec_t1`, `heltec_t114`, `mesh_tracker_x1`, `thinknode_m1`). `cmake -DBOARD=<anything
-  else>` fails outright. Nobody
-  uses the CMake path in practice (CI and `tools/build_all.py` both use
-  `make`); don't assume feature parity between the two build systems.
 - `pinconfig.c` — present on some boards, board-specific pin table.
 
-`Makefile` and `CMakeLists.txt` both dynamically discover the board's files
-under `src/boards/$(BOARD)/` — there is no separate hardcoded board list to
-keep in sync in either build system (unlike the CI matrix, see below).
+The `Makefile` takes the board from `BOARD`: it includes
+`src/boards/$(BOARD)/board.mk`, puts `src/boards/$(BOARD)` on the include path
+for `board.h`, and compiles `pinconfig.c` on every MCU but the nRF52832. Other sources are
+listed explicitly, so a new file in a board directory is not compiled until the
+`Makefile` names it. There is no separate board list to keep in sync here;
+the one hand-kept list is branch protection's required checks (see CI below).
 
 ### Core bootloader (`src/`)
 
