@@ -156,8 +156,8 @@ With the radio connected over **USB/serial** (not Bluetooth), open the connected
 
 If the device does not show up on your computer after flashing the bootloader or performing an OTA update, it may be **waiting in OTA DFU mode**.
 
-In **OTAFIX 2.0** and above, OTA DFU is the default state when no valid application is present.  
-In this mode:
+In **OTAFIX 2.0** and above, OTA DFU is the default state when no valid application is present. From **OTAFIX 2.6**, a device with no valid application on a USB host comes up as a UF2 drive showing NO FIRMWARE instead, and goes straight to OTA DFU on battery (no VBUS). With VBUS but no host (a charger or power bank) it falls through to OTA DFU after 3 seconds, as it does as soon as the cable is pulled while the drive is up. Plugging a cable into a device with no valid application that is waiting in OTA DFU, with no phone connected, brings the drive up again.
+In OTA DFU mode:
 - No UF2 drive is exposed
 - No serial port is available
 - The device is waiting for an OTA firmware update over BLE
@@ -166,7 +166,7 @@ In this mode:
 - Perform an OTA update using a supported DFU app, **or**
 - Explicitly request UF2/serial mode using **double-reset** (or the button hold on a [single-button board](#notes-on-single-button-boards-t1000-e-and-meshtracker-x1)).
 
-This behaviour is intentional and prevents devices from getting stuck in UF2 mode after failed OTA updates.
+The OTA fallback is intentional and prevents devices from getting stuck in UF2 mode after failed OTA updates.
 
 ---
 

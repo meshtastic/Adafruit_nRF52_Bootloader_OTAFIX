@@ -503,6 +503,12 @@ void pstorage_sys_event_handler(uint32_t sys_evt)
 {  
     uint32_t retval = NRF_SUCCESS;
 
+    // Only flash completions may clear flash_access; any other SoC event would drop the pending one.
+    if (sys_evt != NRF_EVT_FLASH_OPERATION_SUCCESS && sys_evt != NRF_EVT_FLASH_OPERATION_ERROR)
+    {
+        return;
+    }
+
     // The event shall only be processed if requested by this module.
     if (m_cmd_queue.flash_access == true)
     {
@@ -749,6 +755,11 @@ uint32_t pstorage_store(pstorage_handle_t * p_dest,
         if (!pending_packet_add(p_dest, p_src, size, offset))
         {
             return NRF_ERROR_NO_MEM;
+        }
+        // flash_access is true only while the SoftDevice holds our request, so an idle queue with elements was never issued.
+        if (!m_cmd_queue.flash_access && m_cmd_queue.count > 0)
+        {
+            cmd_queue_dequeue();
         }
         return NRF_SUCCESS;
     }
