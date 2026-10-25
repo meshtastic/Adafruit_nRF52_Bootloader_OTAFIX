@@ -538,7 +538,8 @@ void dfu_reset_session(void)
 {
     if (m_dfu_state == DFU_STATE_IDLE || m_dfu_state == DFU_STATE_INIT_ERROR) return;
 
-    // Flash ops already issued finish on their own; their callbacks ignore a non-RX state.
+    // Issued flash ops finish on their own: a stale store is dropped by the RX_DATA_PKT gate, and a
+    // stale clear can only report a page that is erased and queued ahead of every new store.
     pstorage_discard_pending();
 
     dfu_page_erased      = NULL;

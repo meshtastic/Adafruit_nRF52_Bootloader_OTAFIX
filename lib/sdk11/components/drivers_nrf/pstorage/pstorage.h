@@ -283,10 +283,10 @@ uint32_t pstorage_load(uint8_t *           p_dest,
  *             a notification callback registered by the application. The 'result' parameter of the
  *             callback indicates if the procedure was successful or not.
  */
+uint32_t pstorage_clear(pstorage_handle_t * p_base_id, pstorage_size_t size);
+
 /**@brief Drops buffered stores that wait on a lazy erase, without calling their callbacks. */
 void pstorage_discard_pending(void);
-
-uint32_t pstorage_clear(pstorage_handle_t * p_base_id, pstorage_size_t size);
 
 /**@brief Function for getting the number of pending operations with the module.
  *
