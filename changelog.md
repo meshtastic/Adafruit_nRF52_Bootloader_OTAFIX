@@ -12,6 +12,7 @@ it and is upstream Adafruit history, kept for provenance.
 - A DFU session started after a SoftDevice update no longer ends before it begins.
 - Build change, no behavior change: the bootloader is now compiled with `-flto`, which shrinks every image by about 3.3 KB of flash. Section addresses and SoftDevice call sites are unchanged.
 - The lazy-erase packet buffer holds 16 packets instead of 8. Costs about 2 KB of `.bss`.
+- A UF2 whose application blocks start below the installed SoftDevice's end and carry no SoftDevice (no block at 0x1000) is now rejected as WRONG FILE: every block of the file is rejected and nothing is written. An app-only image built for a different SoftDevice would have overwritten the last page of the installed one. SoftDevice+app images, app-only images at the application start, and `CURRENT.UF2` restores are unaffected; the check assumes the host writes the file front to back.
 
 ## OTAFIX 2.5
 
