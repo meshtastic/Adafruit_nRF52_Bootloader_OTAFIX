@@ -70,9 +70,12 @@ Each board directory can carry:
   `CFLAGS` like the BLE `DEVICE_NAME`).
 - `pinconfig.c` — present on some boards, board-specific pin table.
 
-The `Makefile` dynamically discovers the board's files under
-`src/boards/$(BOARD)/` — there is no separate hardcoded board list to keep in
-sync (unlike the CI matrix, see below).
+The `Makefile` takes the board from `BOARD`: it includes
+`src/boards/$(BOARD)/board.mk`, puts `src/boards/$(BOARD)` on the include path
+for `board.h`, and compiles `pinconfig.c` on every MCU but the nRF52832. Other sources are
+listed explicitly, so a new file in a board directory is not compiled until the
+`Makefile` names it. There is no separate board list to keep in sync (unlike
+the CI matrix, see below).
 
 ### Core bootloader (`src/`)
 
