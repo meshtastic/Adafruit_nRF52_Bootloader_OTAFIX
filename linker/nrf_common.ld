@@ -135,6 +135,9 @@ SECTIONS
     __sdata_start = .; __sdata_end = .; __sdata_load_start = .;
     __tdata_start = .; __tdata_end = .; __tdata_load_start = .;
     __fast_start  = .; __fast_end  = .; __fast_load_start  = .;
+    /* Zero-length: the startup's clear loop also walks .tbss/.sbss. */
+    __tbss_start__ = .; __tbss_end__ = .;
+    __sbss_start__ = .; __sbss_end__ = .;
 
     .bss :
     {

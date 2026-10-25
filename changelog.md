@@ -10,6 +10,7 @@ it and is upstream Adafruit history, kept for provenance.
 - Fixed BLE OTA started from an application's buttonless DFU falling back to the application after about 10 s. The 0xB1 entry now restarts through the 0xA8 path, so the bootloader initializes the SoftDevice itself; the peer data for reconnection survives the reset.
 - The DFU screen shows upload progress during UF2, serial, and BLE transfers, as a bar in place of the banner. The title reads BOOTLOADER during a bootloader update, ERASE during a factory erase, WRONG FILE for a UF2 this board cannot take, and NO FIRMWARE when DFU starts without a valid application.
 - A DFU session started after a SoftDevice update no longer ends before it begins.
+- Build change, no behavior change: the bootloader is now compiled with `-flto`, which shrinks every image by about 3.3 KB of flash. Section addresses and SoftDevice call sites are unchanged.
 
 ## OTAFIX 2.5
 
