@@ -545,7 +545,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
        * 0x10001014 (bootloader address), and 0x10001018 (MBR Params address).
        *
        * Note: staging overwrites the application tail above BOOTLOADER_ADDR_NEW_RECIEVED, so an
-       * application that reaches it is invalidated before the first block is staged.
+       * application that reaches it is invalidated before the first staged write.
        *
        *                         -------------         -------------         -------------
        *                        |             |       |             |     + |     New     |
@@ -564,24 +564,6 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
        *                         -------------         -------------         -------------
        */
       PRINTF("addr = 0x%08lX, block = %ld (%ld of %ld)\r\n", bl->targetAddr, bl->blockNo, state->numWritten, bl->numBlocks);
-
-      if ( !state->update_bootloader )
-      {
-        bootloader_settings_t const * boot_setting;
-        bootloader_util_settings_get(&boot_setting);
-
-        // A size spanning the whole region is the CURRENT.UF2 full-region fallback, not a measured
-        // application end, so it is treated as unknown like current_flash_size() does.
-        uint32_t const sz = boot_setting->bank_0_size;
-        if ( boot_setting->bank_0 == BANK_VALID_APP && sz != 0 && sz != 0xFFFFFFFFUL &&
-             sz < USER_FLASH_END - DFU_BANK_0_REGION_START &&
-             sz > BOOTLOADER_ADDR_NEW_RECIEVED - DFU_BANK_0_REGION_START )
-        {
-          dfu_update_status_t s = { .status_code = DFU_BANK_0_ERASED };
-          bootloader_dfu_update_process(s);
-          state->app_invalidated = true;
-        }
-      }
 
       state->update_bootloader = true;
       screen_set_title("BOOTLOADER");
@@ -644,6 +626,25 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
                 goto reject;
               }
             }
+          }
+        }
+
+        // Staging overwrites the application tail: invalidate an oversize app before the first staged write.
+        if ( !state->app_invalidated )
+        {
+          bootloader_settings_t const * boot_setting;
+          bootloader_util_settings_get(&boot_setting);
+
+          // A size spanning the whole region is the CURRENT.UF2 full-region fallback, not a measured
+          // application end, so it is treated as unknown like current_flash_size() does.
+          uint32_t const sz = boot_setting->bank_0_size;
+          if ( boot_setting->bank_0 == BANK_VALID_APP && sz != 0 && sz != 0xFFFFFFFFUL &&
+               sz < USER_FLASH_END - DFU_BANK_0_REGION_START &&
+               sz > BOOTLOADER_ADDR_NEW_RECIEVED - DFU_BANK_0_REGION_START )
+          {
+            dfu_update_status_t s = { .status_code = DFU_BANK_0_ERASED };
+            bootloader_dfu_update_process(s);
+            state->app_invalidated = true;
           }
         }
 
