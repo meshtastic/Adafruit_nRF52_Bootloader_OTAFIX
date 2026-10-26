@@ -168,6 +168,8 @@ In OTA DFU mode:
 
 The OTA fallback is intentional and prevents devices from getting stuck in UF2 mode after failed OTA updates.
 
+A device with a valid application that sits in DFU for 6 minutes with no activity (no BLE connection or DFU traffic, no drive access) boots its application. A device with no valid application stays in DFU.
+
 If the bootloader recorded a fault since the last UF2 drive session, `INFO_UF2.TXT` shows a `Last-Fault:` line with the fault id, program counter, and info word. It appears only if the next boot reaches the drive before an application boots, since the application's RAM use wipes the record.
 
 ---
