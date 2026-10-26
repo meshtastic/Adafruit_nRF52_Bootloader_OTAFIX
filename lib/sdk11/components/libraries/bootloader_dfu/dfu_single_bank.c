@@ -534,6 +534,23 @@ uint32_t dfu_image_activate()
 }
 
 
+void dfu_reset_session(void)
+{
+    if (m_dfu_state == DFU_STATE_IDLE || m_dfu_state == DFU_STATE_INIT_ERROR) return;
+
+    // Issued flash ops finish on their own: a stale store is dropped by the RX_DATA_PKT gate, and a
+    // stale clear can only report a page that is erased and queued ahead of every new store.
+    pstorage_discard_pending();
+
+    dfu_page_erased      = NULL;
+    dfu_image_page_count = 0;
+    m_init_packet_length = 0;
+    m_image_crc          = 0;
+    m_data_received      = 0;
+    m_dfu_state          = DFU_STATE_IDLE;
+}
+
+
 void dfu_reset(void)
 {
     dfu_update_status_t update_status;

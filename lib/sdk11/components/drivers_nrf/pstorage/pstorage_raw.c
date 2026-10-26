@@ -775,6 +775,20 @@ uint32_t pstorage_clear(pstorage_handle_t * p_dest, pstorage_size_t size)
 }
 
 
+void pstorage_discard_pending(void)
+{
+    // The head entry stays when its store is in flight; its completion pops it.
+    uint8_t keep = m_processing_pending ? 1 : 0;
+
+    while (m_pending_count > keep)
+    {
+        m_pending_write_idx = (m_pending_write_idx + PENDING_PACKET_COUNT - 1) % PENDING_PACKET_COUNT;
+        m_pending_packets[m_pending_write_idx].valid = false;
+        m_pending_count--;
+    }
+}
+
+
 /**
  * @}
  */

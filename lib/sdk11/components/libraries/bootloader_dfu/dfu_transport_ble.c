@@ -496,6 +496,24 @@ static void accum_flush(ble_dfu_t * p_dfu)
     m_accum_bytes_pending = 0;
 }
 
+/**@brief     Drops the unfinished transfer so the next connection can start over. */
+static void session_reset(void)
+{
+    dfu_reset_session();
+    (void) hci_mem_pool_open();
+
+    m_num_of_firmware_bytes_rcvd = 0;
+    m_pkt_notif_target           = 0;
+    m_pkt_notif_target_cnt       = 0;
+    m_pkt_rcpt_notif_enabled     = false;
+    m_pkt_type                   = PKT_TYPE_INVALID;
+    mp_final_packet              = NULL;
+    m_accum_len                  = 0;
+    m_accum_active               = false;
+    m_accum_bytes_pending        = 0;
+    m_reported_image_size        = 0;
+}
+
 /**@brief     Function for processing application data written by the peer to the DFU Packet
  *            Characteristic.
  *
@@ -934,6 +952,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
                 // disconnect triggered by the DFU Controller before the firmware update was
                 // complete).
                 // Restart advertising so that the DFU Controller can reconnect if possible.
+                session_reset();
                 advertising_start();
             }
 
