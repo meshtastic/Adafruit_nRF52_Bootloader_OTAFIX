@@ -19,6 +19,7 @@
 #include "nrf.h"
 #include "nrf_soc.h"
 #include "app_util.h"
+#include "app_scheduler.h"
 
 /** @file
  *
@@ -496,6 +497,43 @@ static bool lazy_erase_check_and_trigger(pstorage_handle_t * p_handle, pstorage_
 }
 
 
+static void flash_retry(void);
+
+static void flash_retry_kick(void * p_event_data, uint16_t event_size)
+{
+    (void) p_event_data;
+    (void) event_size;
+    if (!m_cmd_queue.flash_access && m_cmd_queue.count > 0)
+    {
+        flash_retry();
+    }
+}
+
+/**
+ * @brief Re-issue the element at rp after a flash timeout, or report the timeout once retries run out.
+ */
+static void flash_retry(void)
+{
+    if (m_flash_retries < FLASH_RETRY_LIMIT)
+    {
+        m_flash_retries++;
+        uint32_t retval = cmd_process();
+        if (retval == NRF_SUCCESS)
+        {
+            return;
+        }
+        // BUSY: no flash event will follow, so re-issue from the scheduler.
+        if (retval == NRF_ERROR_BUSY && app_sched_event_put(NULL, 0, flash_retry_kick) == NRF_SUCCESS)
+        {
+            return;
+        }
+    }
+    m_flash_retries = 0;
+    m_lazy_erase_active = false;
+    m_processing_pending = false;
+    app_notify(NRF_ERROR_TIMEOUT, &m_cmd_queue.cmd[m_cmd_queue.rp]);
+}
+
 /**
  * @brief Function for handling of system events from SoftDevice.
  *
@@ -613,20 +651,7 @@ void pstorage_sys_event_handler(uint32_t sys_evt)
 
             case NRF_EVT_FLASH_OPERATION_ERROR:
                 // The SoftDevice missed its radio gap; erase and same-word write are safe to repeat.
-                if (m_flash_retries < FLASH_RETRY_LIMIT)
-                {
-                    m_flash_retries++;
-                    retval = cmd_process();
-                    if (retval == NRF_SUCCESS || retval == NRF_ERROR_BUSY)
-                    {
-                        // BUSY leaves the element queued for the next dequeue kick.
-                        break;
-                    }
-                }
-                m_flash_retries = 0;
-                m_lazy_erase_active = false;
-                m_processing_pending = false;
-                app_notify(NRF_ERROR_TIMEOUT, &m_cmd_queue.cmd[m_cmd_queue.rp]);
+                flash_retry();
                 break;
 
             default:
