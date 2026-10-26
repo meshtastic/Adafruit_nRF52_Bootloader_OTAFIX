@@ -168,6 +168,8 @@ In OTA DFU mode:
 
 The OTA fallback is intentional and prevents devices from getting stuck in UF2 mode after failed OTA updates.
 
+If the bootloader recorded a fault since the last UF2 drive session, `INFO_UF2.TXT` shows a `Last-Fault:` line with the fault id, program counter, and info word. It appears only if the next boot reaches the drive before an application boots, since the application's RAM use wipes the record.
+
 ---
 
 ### OTA update fails with `Error: Operation Failed`
