@@ -47,6 +47,7 @@
   #error No target defined
 #endif
 
+#define FLASH_RETRY_LIMIT           5       /**<  Timed-out flash operations re-issued before the error is reported. */
 #define PENDING_PACKET_SIZE         256     /**<  Maximum size of a single pending packet data buffer. */
 #define PENDING_PACKET_COUNT        16      /**<  Packets buffered during lazy erase; must exceed the largest client PRN interval (Android 10, Apple 8). */
 
@@ -125,6 +126,7 @@ static uint8_t          m_pending_count;                              /**< Numbe
 static bool             m_lazy_erase_active;                          /**< True if a lazy erase is in progress. */
 static uint32_t         m_lazy_erase_page;                            /**< Page index currently being erased. */
 static bool             m_processing_pending;                         /**< True if processing a pending packet store. */
+static uint8_t          m_flash_retries;                              /**< Timeouts retried for the operation at rp. */
 
 /**
  * @brief Function for processing of commands and issuing flash access request to the SoftDevice.
@@ -519,6 +521,7 @@ void pstorage_sys_event_handler(uint32_t sys_evt)
             case NRF_EVT_FLASH_OPERATION_SUCCESS:
             {
                 p_cmd = &m_cmd_queue.cmd[m_cmd_queue.rp];
+                m_flash_retries = 0;
                 m_round_val++;
 
                 bool command_finished = ((m_round_val * SOC_MAX_WRITE_SIZE) >= p_cmd->size);
@@ -609,6 +612,18 @@ void pstorage_sys_event_handler(uint32_t sys_evt)
             break;
 
             case NRF_EVT_FLASH_OPERATION_ERROR:
+                // The SoftDevice missed its radio gap; erase and same-word write are safe to repeat.
+                if (m_flash_retries < FLASH_RETRY_LIMIT)
+                {
+                    m_flash_retries++;
+                    retval = cmd_process();
+                    if (retval == NRF_SUCCESS || retval == NRF_ERROR_BUSY)
+                    {
+                        // BUSY leaves the element queued for the next dequeue kick.
+                        break;
+                    }
+                }
+                m_flash_retries = 0;
                 m_lazy_erase_active = false;
                 m_processing_pending = false;
                 app_notify(NRF_ERROR_TIMEOUT, &m_cmd_queue.cmd[m_cmd_queue.rp]);
@@ -705,6 +720,7 @@ uint32_t pstorage_init(void)
 
     m_next_app_instance = 0;
     m_round_val         = 0;
+    m_flash_retries     = 0;
 
     for(unsigned int index = 0; index < PSTORAGE_NUM_OF_PAGES; index++)
     {
