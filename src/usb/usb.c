@@ -123,6 +123,7 @@ bool usb_host_mounted(void) {
 
 void tud_mount_cb(void) {
   _host_mounted = true;
+  dfu_activity();
   led_state(STATE_USB_MOUNTED);
 }
 

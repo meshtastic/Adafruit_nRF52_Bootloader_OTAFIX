@@ -54,6 +54,17 @@ static bool m_cancel_timeout_on_usb; /**< If set the timeout is cancelled when U
 APP_TIMER_DEF( _dfu_startup_timer );
 volatile bool dfu_startup_packet_received = false;
 
+#ifndef DFU_INACTIVITY_TIMEOUT_MS
+#define DFU_INACTIVITY_TIMEOUT_MS  (6 * 60 * 1000)
+#endif
+#define DFU_INACTIVITY_TICK_MS     1000
+
+// dfu_activity() only sets a flag, so it is cheap from any context; a 1 s tick turns it into the idle count.
+APP_TIMER_DEF( _dfu_inactivity_timer );
+static volatile bool m_dfu_activity;
+static bool          m_inactivity_armed;
+static uint32_t      m_inactivity_idle_ms;
+
 /**@brief   Function for handling callbacks from pstorage module.
  *
  * @details Handles pstorage results for clear and storage operation. For detailed description of
@@ -91,6 +102,43 @@ static void dfu_startup_timer_handler(void * p_context)
   // No packets are received within timeout, exit DFU mode
   // dfu_startup_packet_received is set by process_dfu_packet() in dfu_transport_serial.c
   if (!dfu_startup_packet_received)
+  {
+    dfu_update_status_t update_status;
+    update_status.status_code = DFU_TIMEOUT;
+
+    bootloader_dfu_update_process(update_status);
+  }
+}
+
+void dfu_activity(void)
+{
+  m_dfu_activity = true;
+}
+
+// A session that sat idle with a valid application ends like the startup timeout, so main() boots the application.
+// A started transfer has invalidated bank 0, and with no application the wait stays.
+static void dfu_inactivity_timer_handler(void * p_context)
+{
+  if (!m_inactivity_armed) return;
+
+  if (m_dfu_activity)
+  {
+    m_dfu_activity = false;
+    m_inactivity_idle_ms = 0;
+  }
+  else
+  {
+    m_inactivity_idle_ms += DFU_INACTIVITY_TICK_MS;
+  }
+
+  if (m_inactivity_idle_ms < DFU_INACTIVITY_TIMEOUT_MS)
+  {
+    app_timer_start(_dfu_inactivity_timer, APP_TIMER_TICKS(DFU_INACTIVITY_TICK_MS), NULL);
+    return;
+  }
+
+  m_inactivity_armed = false;
+  if (m_update_status == BOOTLOADER_UPDATING && bootloader_app_is_valid())
   {
     dfu_update_status_t update_status;
     update_status.status_code = DFU_TIMEOUT;
@@ -355,7 +403,16 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout
     err_code = dfu_transport_serial_update_start();
   }
 
+  m_dfu_activity       = false;
+  m_inactivity_idle_ms = 0;
+  m_inactivity_armed   = true;
+  app_timer_create(&_dfu_inactivity_timer, APP_TIMER_MODE_SINGLE_SHOT, dfu_inactivity_timer_handler);
+  app_timer_start(_dfu_inactivity_timer, APP_TIMER_TICKS(DFU_INACTIVITY_TICK_MS), NULL);
+
   wait_for_events();
+
+  m_inactivity_armed = false;
+  app_timer_stop(_dfu_inactivity_timer);
 
   return err_code;
 }

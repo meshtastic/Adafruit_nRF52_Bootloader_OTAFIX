@@ -708,6 +708,8 @@ static void on_dfu_evt(ble_dfu_t * p_dfu, ble_dfu_evt_t * p_evt)
     uint32_t           err_code;
     ble_dfu_resp_val_t resp_val;
 
+    dfu_activity();
+
     switch (p_evt->ble_dfu_evt_type)
     {
         case BLE_DFU_VALIDATE:
@@ -923,6 +925,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
+            dfu_activity();
             m_conn_handle    = p_ble_evt->evt.gap_evt.conn_handle;
             m_is_advertising = false;
 

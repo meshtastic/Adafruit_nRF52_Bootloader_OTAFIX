@@ -44,6 +44,12 @@ bool bootloader_app_is_valid(void);
  */
 uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout_on_usb);
 
+/**@brief Function for telling the DFU inactivity timeout that the session is not idle.
+ *
+ * @details Safe to call from any context, before or during a session.
+ */
+void dfu_activity(void);
+
 /**@brief Function for exiting bootloader and booting into application.
  *
  * @details This function will disable SoftDevice and all interrupts before jumping to application.

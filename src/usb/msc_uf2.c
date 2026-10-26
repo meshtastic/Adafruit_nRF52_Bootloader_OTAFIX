@@ -155,6 +155,7 @@ int32_t tud_msc_scsi_cb (uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, 
 int32_t tud_msc_read10_cb (uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
 {
   (void) lun;
+  dfu_activity();
   memset(buffer, 0, bufsize);
 
   // since we return block size each, offset should always be zero
@@ -179,6 +180,7 @@ int32_t tud_msc_read10_cb (uint8_t lun, uint32_t lba, uint32_t offset, void* buf
 int32_t tud_msc_write10_cb (uint8_t lun, uint32_t lba, uint32_t offset, uint8_t* buffer, uint32_t bufsize)
 {
   (void) lun;
+  dfu_activity();
 
   uint32_t count = 0;
   while ( count < bufsize )
