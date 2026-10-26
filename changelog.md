@@ -1,10 +1,12 @@
 # Adafruit nRF52 Bootloader Changelog
 
-OTAFIX 2.1–2.6 are Meshtastic's fork; everything from 0.6.2 down predates
-it and is upstream Adafruit history, kept for provenance.
+2.6.0 and the OTAFIX 2.x entries below it are Meshtastic's fork; everything
+from 0.6.2 down predates it and is upstream Adafruit history, kept for
+provenance.
 
-## OTAFIX 2.6
+## 2.6.0
 
+- The project is renamed the Meshtastic nRF52 Bootloader (repo `meshtastic/nrf52-bootloader`), and releases are tagged plain `x.y.z` from 2.6.0, continuing the OTAFIX numbering. Board-IDs, BLE names and asset file names are unchanged.
 - New board: Seeed Studio Wio Tracker L1 Pro 1W (OTA DFU advertising name `WTLP_DFU`).
 - A board with a valid application that sits in DFU for 6 minutes with no activity boots its application. A BLE connection or DFU write, a UF2 drive read or write, USB enumeration, and serial DFU traffic each restart the 6 minutes; a board with no valid application keeps waiting.
 - A SoftDevice flash timeout during a BLE or serial transfer, or the activation settings save, is retried every 100 ms, up to 20 times, instead of resetting the bootloader.
