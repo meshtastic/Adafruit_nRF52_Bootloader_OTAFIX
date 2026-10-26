@@ -20,6 +20,7 @@
 #include "nrf_soc.h"
 #include "app_util.h"
 #include "app_scheduler.h"
+#include "app_timer.h"
 
 /** @file
  *
@@ -48,7 +49,9 @@
   #error No target defined
 #endif
 
-#define FLASH_RETRY_LIMIT           5       /**<  Timed-out flash operations re-issued before the error is reported. */
+#define FLASH_RETRY_LIMIT           20      /**<  Timed-out flash operations re-issued before the error is reported. */
+#define FLASH_RETRY_DELAY_MS        100     /**<  Wait before re-issuing a timed-out operation; 20 x 100 ms gives the radio 2 s to quiet. */
+#define FLASH_BUSY_KICK_LIMIT       5       /**<  BUSY re-issues scheduled for one operation. */
 #define PENDING_PACKET_SIZE         256     /**<  Maximum size of a single pending packet data buffer. */
 #define PENDING_PACKET_COUNT        16      /**<  Packets buffered during lazy erase; must exceed the largest client PRN interval (Android 10, Apple 8). */
 
@@ -128,6 +131,7 @@ static bool             m_lazy_erase_active;                          /**< True 
 static uint32_t         m_lazy_erase_page;                            /**< Page index currently being erased. */
 static bool             m_processing_pending;                         /**< True if processing a pending packet store. */
 static uint8_t          m_flash_retries;                              /**< Timeouts retried for the operation at rp. */
+APP_TIMER_DEF(m_flash_retry_timer);
 static uint8_t          m_flash_busy_kicks;                           /**< BUSY re-issues scheduled for the operation at rp. */
 
 /**
@@ -528,7 +532,7 @@ static void flash_retry_issue(void)
     {
         return;
     }
-    if (retval == NRF_ERROR_BUSY && m_flash_busy_kicks < FLASH_RETRY_LIMIT &&
+    if (retval == NRF_ERROR_BUSY && m_flash_busy_kicks < FLASH_BUSY_KICK_LIMIT &&
         app_sched_event_put(NULL, 0, flash_retry_kick) == NRF_SUCCESS)
     {
         m_flash_busy_kicks++;
@@ -537,16 +541,25 @@ static void flash_retry_issue(void)
     flash_retry_fail(retval);
 }
 
-/** @brief After a flash timeout, re-issue the element at rp, or report the timeout once retries run out. */
+static void flash_retry_timer_handler(void * p_context)
+{
+    (void) p_context;
+    if (app_sched_event_put(NULL, 0, flash_retry_kick) != NRF_SUCCESS)
+    {
+        app_timer_start(m_flash_retry_timer, APP_TIMER_TICKS(FLASH_RETRY_DELAY_MS), NULL);
+    }
+}
+
+/** @brief After a flash timeout, re-issue the element at rp after a delay, or report the timeout once retries run out. */
 static void flash_retry(void)
 {
-    if (m_flash_retries >= FLASH_RETRY_LIMIT)
+    if (m_flash_retries >= FLASH_RETRY_LIMIT ||
+        app_timer_start(m_flash_retry_timer, APP_TIMER_TICKS(FLASH_RETRY_DELAY_MS), NULL) != NRF_SUCCESS)
     {
         flash_retry_fail(NRF_ERROR_TIMEOUT);
         return;
     }
     m_flash_retries++;
-    flash_retry_issue();
 }
 
 /**
@@ -763,6 +776,7 @@ uint32_t pstorage_init(void)
     m_round_val         = 0;
     m_flash_retries     = 0;
     m_flash_busy_kicks  = 0;
+    (void) app_timer_create(&m_flash_retry_timer, APP_TIMER_MODE_SINGLE_SHOT, flash_retry_timer_handler);
 
     for(unsigned int index = 0; index < PSTORAGE_NUM_OF_PAGES; index++)
     {
