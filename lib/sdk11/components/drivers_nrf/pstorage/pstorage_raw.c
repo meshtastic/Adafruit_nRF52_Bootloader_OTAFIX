@@ -19,6 +19,8 @@
 #include "nrf.h"
 #include "nrf_soc.h"
 #include "app_util.h"
+#include "app_scheduler.h"
+#include "app_timer.h"
 
 /** @file
  *
@@ -47,6 +49,9 @@
   #error No target defined
 #endif
 
+#define FLASH_RETRY_LIMIT           20      /**<  Timed-out flash operations re-issued before the error is reported. */
+#define FLASH_RETRY_DELAY_MS        100     /**<  Wait before re-issuing a timed-out operation; 20 x 100 ms gives the radio 2 s to quiet. */
+#define FLASH_BUSY_KICK_LIMIT       5       /**<  BUSY re-issues scheduled for one operation. */
 #define PENDING_PACKET_SIZE         256     /**<  Maximum size of a single pending packet data buffer. */
 #define PENDING_PACKET_COUNT        16      /**<  Packets buffered during lazy erase; must exceed the largest client PRN interval (Android 10, Apple 8). */
 
@@ -125,6 +130,9 @@ static uint8_t          m_pending_count;                              /**< Numbe
 static bool             m_lazy_erase_active;                          /**< True if a lazy erase is in progress. */
 static uint32_t         m_lazy_erase_page;                            /**< Page index currently being erased. */
 static bool             m_processing_pending;                         /**< True if processing a pending packet store. */
+static uint8_t          m_flash_retries;                              /**< Timeouts retried for the operation at rp. */
+APP_TIMER_DEF(m_flash_retry_timer);
+static uint8_t          m_flash_busy_kicks;                           /**< BUSY re-issues scheduled for the operation at rp. */
 
 /**
  * @brief Function for processing of commands and issuing flash access request to the SoftDevice.
@@ -494,6 +502,66 @@ static bool lazy_erase_check_and_trigger(pstorage_handle_t * p_handle, pstorage_
 }
 
 
+static void flash_retry_issue(void);
+
+/** @brief Give up on the element at rp and report the error to its owner. */
+static void flash_retry_fail(uint32_t result)
+{
+    m_flash_retries     = 0;
+    m_flash_busy_kicks  = 0;
+    m_lazy_erase_active = false;
+    m_processing_pending = false;
+    app_notify(result, &m_cmd_queue.cmd[m_cmd_queue.rp]);
+}
+
+static void flash_retry_kick(void * p_event_data, uint16_t event_size)
+{
+    (void) p_event_data;
+    (void) event_size;
+    if (!m_cmd_queue.flash_access && m_cmd_queue.count > 0)
+    {
+        flash_retry_issue();
+    }
+}
+
+/** @brief Re-issue the element at rp; BUSY is re-kicked from the scheduler on its own bound. */
+static void flash_retry_issue(void)
+{
+    uint32_t retval = cmd_process();
+    if (retval == NRF_SUCCESS)
+    {
+        return;
+    }
+    if (retval == NRF_ERROR_BUSY && m_flash_busy_kicks < FLASH_BUSY_KICK_LIMIT &&
+        app_sched_event_put(NULL, 0, flash_retry_kick) == NRF_SUCCESS)
+    {
+        m_flash_busy_kicks++;
+        return;
+    }
+    flash_retry_fail(retval);
+}
+
+static void flash_retry_timer_handler(void * p_context)
+{
+    (void) p_context;
+    if (app_sched_event_put(NULL, 0, flash_retry_kick) != NRF_SUCCESS)
+    {
+        app_timer_start(m_flash_retry_timer, APP_TIMER_TICKS(FLASH_RETRY_DELAY_MS), NULL);
+    }
+}
+
+/** @brief After a flash timeout, re-issue the element at rp after a delay, or report the timeout once retries run out. */
+static void flash_retry(void)
+{
+    if (m_flash_retries >= FLASH_RETRY_LIMIT ||
+        app_timer_start(m_flash_retry_timer, APP_TIMER_TICKS(FLASH_RETRY_DELAY_MS), NULL) != NRF_SUCCESS)
+    {
+        flash_retry_fail(NRF_ERROR_TIMEOUT);
+        return;
+    }
+    m_flash_retries++;
+}
+
 /**
  * @brief Function for handling of system events from SoftDevice.
  *
@@ -519,6 +587,8 @@ void pstorage_sys_event_handler(uint32_t sys_evt)
             case NRF_EVT_FLASH_OPERATION_SUCCESS:
             {
                 p_cmd = &m_cmd_queue.cmd[m_cmd_queue.rp];
+                m_flash_retries = 0;
+                m_flash_busy_kicks = 0;
                 m_round_val++;
 
                 bool command_finished = ((m_round_val * SOC_MAX_WRITE_SIZE) >= p_cmd->size);
@@ -609,9 +679,8 @@ void pstorage_sys_event_handler(uint32_t sys_evt)
             break;
 
             case NRF_EVT_FLASH_OPERATION_ERROR:
-                m_lazy_erase_active = false;
-                m_processing_pending = false;
-                app_notify(NRF_ERROR_TIMEOUT, &m_cmd_queue.cmd[m_cmd_queue.rp]);
+                // The SoftDevice could not start the operation in a radio gap, so nothing was written; re-issue it.
+                flash_retry();
                 break;
 
             default:
@@ -705,6 +774,9 @@ uint32_t pstorage_init(void)
 
     m_next_app_instance = 0;
     m_round_val         = 0;
+    m_flash_retries     = 0;
+    m_flash_busy_kicks  = 0;
+    (void) app_timer_create(&m_flash_retry_timer, APP_TIMER_MODE_SINGLE_SHOT, flash_retry_timer_handler);
 
     for(unsigned int index = 0; index < PSTORAGE_NUM_OF_PAGES; index++)
     {
