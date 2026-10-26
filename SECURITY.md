@@ -4,6 +4,7 @@
 
 | Bootloader Version | Supported          |
 | ------------------- | ------------------ |
+| 2.6.0 and later      | :white_check_mark: |
 | OTAFIX 2.x           | :white_check_mark: |
 | < OTAFIX 2.0         | :x:                |
 

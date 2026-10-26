@@ -14,13 +14,14 @@ Canonical guidance for AI coding agents and maintainers working in this repo.
 2. The rest of `README.md` — boards supported, installation, the Meshtastic
    Android in-app upgrade flow, troubleshooting.
 3. `CONTRIBUTING.md` — dev setup, PR process, adding a new board.
-4. `changelog.md` — OTAFIX version history (2.1–2.6 at the top; everything
-   below predates the OTAFIX fork).
+4. `changelog.md` — version history (`2.6.0` and the `OTAFIX 2.x` entries at
+   the top; everything below predates the OTAFIX fork).
 5. The design invariants and gotchas below — do not violate them.
 
 ## What this is
 
-Meshtastic's fork (org-owned since 2026-08) of
+The Meshtastic nRF52 Bootloader (formerly the OTAFIX bootloader; repo
+`meshtastic/nrf52-bootloader`), org-owned since 2026-08. It is a fork of
 [oltaco's OTAFIX bootloader](https://github.com/oltaco/Adafruit_nRF52_Bootloader_OTAFIX),
 itself a fork of `adafruit/Adafruit_nRF52_Bootloader` with OTA DFU
 enhancements. It's the bootloader several nRF52-based Meshtastic devices
@@ -148,6 +149,9 @@ itself; a human has to edit it too.
 
 ## Gotchas
 
+- **Release tags are bare `x.y.z`.** The Makefile parses the first
+  dash-separated `x.y.z` of `git describe` into `MK_BOOTLOADER_VERSION`, so a
+  `v` prefix breaks the build.
 - **ARM GCC version matters.** CI pins exactly `12.3.Rel1`; 13.3.Rel1 also
   compiles clean and is the closest verified-working version if you can't
   get the exact CI-pinned one. GCC 15 is unverified here.
