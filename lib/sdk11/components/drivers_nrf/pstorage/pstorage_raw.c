@@ -128,6 +128,7 @@ static bool             m_lazy_erase_active;                          /**< True 
 static uint32_t         m_lazy_erase_page;                            /**< Page index currently being erased. */
 static bool             m_processing_pending;                         /**< True if processing a pending packet store. */
 static uint8_t          m_flash_retries;                              /**< Timeouts retried for the operation at rp. */
+static uint8_t          m_flash_busy_kicks;                           /**< BUSY re-issues scheduled for the operation at rp. */
 
 /**
  * @brief Function for processing of commands and issuing flash access request to the SoftDevice.
@@ -497,7 +498,17 @@ static bool lazy_erase_check_and_trigger(pstorage_handle_t * p_handle, pstorage_
 }
 
 
-static void flash_retry(void);
+static void flash_retry_issue(void);
+
+/** @brief Give up on the element at rp and report the error to its owner. */
+static void flash_retry_fail(uint32_t result)
+{
+    m_flash_retries     = 0;
+    m_flash_busy_kicks  = 0;
+    m_lazy_erase_active = false;
+    m_processing_pending = false;
+    app_notify(result, &m_cmd_queue.cmd[m_cmd_queue.rp]);
+}
 
 static void flash_retry_kick(void * p_event_data, uint16_t event_size)
 {
@@ -505,33 +516,37 @@ static void flash_retry_kick(void * p_event_data, uint16_t event_size)
     (void) event_size;
     if (!m_cmd_queue.flash_access && m_cmd_queue.count > 0)
     {
-        flash_retry();
+        flash_retry_issue();
     }
 }
 
-/**
- * @brief Re-issue the element at rp after a flash timeout, or report the timeout once retries run out.
- */
+/** @brief Re-issue the element at rp; BUSY is re-kicked from the scheduler on its own bound. */
+static void flash_retry_issue(void)
+{
+    uint32_t retval = cmd_process();
+    if (retval == NRF_SUCCESS)
+    {
+        return;
+    }
+    if (retval == NRF_ERROR_BUSY && m_flash_busy_kicks < FLASH_RETRY_LIMIT &&
+        app_sched_event_put(NULL, 0, flash_retry_kick) == NRF_SUCCESS)
+    {
+        m_flash_busy_kicks++;
+        return;
+    }
+    flash_retry_fail(retval);
+}
+
+/** @brief After a flash timeout, re-issue the element at rp, or report the timeout once retries run out. */
 static void flash_retry(void)
 {
-    if (m_flash_retries < FLASH_RETRY_LIMIT)
+    if (m_flash_retries >= FLASH_RETRY_LIMIT)
     {
-        m_flash_retries++;
-        uint32_t retval = cmd_process();
-        if (retval == NRF_SUCCESS)
-        {
-            return;
-        }
-        // BUSY: no flash event will follow, so re-issue from the scheduler.
-        if (retval == NRF_ERROR_BUSY && app_sched_event_put(NULL, 0, flash_retry_kick) == NRF_SUCCESS)
-        {
-            return;
-        }
+        flash_retry_fail(NRF_ERROR_TIMEOUT);
+        return;
     }
-    m_flash_retries = 0;
-    m_lazy_erase_active = false;
-    m_processing_pending = false;
-    app_notify(NRF_ERROR_TIMEOUT, &m_cmd_queue.cmd[m_cmd_queue.rp]);
+    m_flash_retries++;
+    flash_retry_issue();
 }
 
 /**
@@ -560,6 +575,7 @@ void pstorage_sys_event_handler(uint32_t sys_evt)
             {
                 p_cmd = &m_cmd_queue.cmd[m_cmd_queue.rp];
                 m_flash_retries = 0;
+                m_flash_busy_kicks = 0;
                 m_round_val++;
 
                 bool command_finished = ((m_round_val * SOC_MAX_WRITE_SIZE) >= p_cmd->size);
@@ -650,7 +666,7 @@ void pstorage_sys_event_handler(uint32_t sys_evt)
             break;
 
             case NRF_EVT_FLASH_OPERATION_ERROR:
-                // The SoftDevice missed its radio gap; erase and same-word write are safe to repeat.
+                // The SoftDevice could not start the operation in a radio gap, so nothing was written; re-issue it.
                 flash_retry();
                 break;
 
@@ -746,6 +762,7 @@ uint32_t pstorage_init(void)
     m_next_app_instance = 0;
     m_round_val         = 0;
     m_flash_retries     = 0;
+    m_flash_busy_kicks  = 0;
 
     for(unsigned int index = 0; index < PSTORAGE_NUM_OF_PAGES; index++)
     {
