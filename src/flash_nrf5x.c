@@ -60,14 +60,25 @@ void flash_nrf5x_flush (bool need_erase)
 
 void flash_nrf5x_write (uint32_t dst, void const *src, int len, bool need_erase)
 {
-  uint32_t newAddr = dst & ~(FLASH_PAGE_SIZE - 1);
-
-  if ( newAddr != _fl_addr )
+  while ( len > 0 )
   {
-    flash_nrf5x_flush(need_erase);
-    _fl_addr = newAddr;
-    memcpy(_fl_buf, (void *) newAddr, FLASH_PAGE_SIZE);
-  }
-  memcpy(_fl_buf + (dst & (FLASH_PAGE_SIZE - 1)), src, len);
-}
+    uint32_t newAddr = dst & ~(FLASH_PAGE_SIZE - 1);
 
+    if ( newAddr != _fl_addr )
+    {
+      flash_nrf5x_flush(need_erase);
+      _fl_addr = newAddr;
+      memcpy(_fl_buf, (void *) newAddr, FLASH_PAGE_SIZE);
+    }
+
+    uint32_t offset = dst & (FLASH_PAGE_SIZE - 1);
+    uint32_t n = FLASH_PAGE_SIZE - offset;
+    if ( n > (uint32_t) len ) n = (uint32_t) len;
+
+    memcpy(_fl_buf + offset, src, n);
+
+    dst += n;
+    src = (uint8_t const *) src + n;
+    len -= (int) n;
+  }
+}
