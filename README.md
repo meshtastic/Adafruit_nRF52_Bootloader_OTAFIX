@@ -89,6 +89,7 @@ bootloader and SoftDevice zip package").
 - Seeed Studio SenseCAP MeshTracker X1 ([See note](#notes-on-single-button-boards-t1000-e-and-meshtracker-x1))
 - Seeed SenseCAP Solar Node P1
 - Seeed Studio Wio Tracker L1
+- Seeed Studio Wio Tracker L1 Pro 1W
 - Seeed Studio XIAO nRF52840 BLE ([See note](#notes-on-xiao-nrf52840-ble))
 - Seeed Studio XIAO nRF52840 BLE SENSE
 
@@ -117,6 +118,7 @@ When in OTA DFU mode, devices advertise using a board-specific name rather than 
 | Seeed SenseCAP Solar Node P1 | `SCAP_DFU`               |
 | Seeed T1000e                 | `T1KE_DFU`               |
 | Seeed WioTracker L1          | `WTL1_DFU`               |
+| Seeed WioTracker L1 Pro 1W   | `WTLP_DFU`               |
 | XIAO NRF52 BLE / SENSE       | `XIAO_DFU`               |
 
 ---
