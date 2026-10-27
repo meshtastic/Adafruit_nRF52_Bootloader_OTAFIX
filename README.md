@@ -81,6 +81,7 @@ bootloader and SoftDevice zip package").
 - LilyGO T-Echo
 - Minewsemi MX25LE01
 - MuziWorks Base Uno / Base Duo / Superbase
+- Meshtastic Generic, S140 6.1.1 (`meshtastic_6.1.1`) and 7.3.0 (`meshtastic_7.3.0`), for DIY boards with no board-specific bootloader: no LED or button
 - Nologo ProMicro NRF52840 (aka SuperMini NRF52840)
 - RAK 3401
 - RAK 4631 ([See note](#notes-on-rak4631-bootloader))
@@ -110,6 +111,7 @@ When in OTA DFU mode, devices advertise using a board-specific name rather than 
 | LILYGO T-Echo                | `LGTE_DFU`               |
 | Minewsemi MX25LE01           | `MX25_DFU`               |
 | MuziWorks Base / Superbase   | `MUZI_DFU`               |
+| Meshtastic Generic           | `MESH_DFU`               |
 | ProMicro NRF52840            | `PROM_DFU`               |
 | RAK 4631                     | `4631_DFU`               |
 | RAK 3401                     | `3401_DFU`               |
