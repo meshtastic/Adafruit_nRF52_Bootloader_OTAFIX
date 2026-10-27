@@ -21,7 +21,7 @@ Canonical guidance for AI coding agents and maintainers working in this repo.
 ## What this is
 
 The Meshtastic nRF52 Bootloader (formerly the OTAFIX bootloader; repo
-`meshtastic/nrf52-bootloader`), org-owned since 2026-08. It is a fork of
+`meshtastic/nRF52_Bootloader`), org-owned since 2026-08. It is a fork of
 [oltaco's OTAFIX bootloader](https://github.com/oltaco/Adafruit_nRF52_Bootloader_OTAFIX),
 itself a fork of `adafruit/Adafruit_nRF52_Bootloader` with OTA DFU
 enhancements. It's the bootloader several nRF52-based Meshtastic devices

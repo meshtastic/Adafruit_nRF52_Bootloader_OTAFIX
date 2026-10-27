@@ -1,6 +1,6 @@
 # Meshtastic nRF52 Bootloader
 
-[![Build](https://github.com/meshtastic/nrf52-bootloader/actions/workflows/githubci.yml/badge.svg)](https://github.com/meshtastic/nrf52-bootloader/actions/workflows/githubci.yml)
+[![Build](https://github.com/meshtastic/nRF52_Bootloader/actions/workflows/githubci.yml/badge.svg)](https://github.com/meshtastic/nRF52_Bootloader/actions/workflows/githubci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 Adafruit nRF52 bootloader with enhanced OTA DFU, forked for [Meshtastic](https://meshtastic.org) from [oltaco's OTAFIX bootloader](https://github.com/oltaco/Adafruit_nRF52_Bootloader_OTAFIX), itself a fork of [Adafruit's nRF52 bootloader](https://github.com/adafruit/Adafruit_nRF52_Bootloader). It was previously called the OTAFIX bootloader. This is the bootloader several nRF52-based Meshtastic devices ship with, and the one the [Meshtastic Android app](https://github.com/meshtastic/Meshtastic-Android) can upgrade in-app.
@@ -93,7 +93,7 @@ bootloader and SoftDevice zip package").
 - Seeed Studio XIAO nRF52840 BLE ([See note](#notes-on-xiao-nrf52840-ble))
 - Seeed Studio XIAO nRF52840 BLE SENSE
 
-If there is another nRF52840-based Meshtastic board you would like to see supported, please [raise a GitHub issue](https://github.com/meshtastic/nrf52-bootloader/issues/new/choose) — or see [Adding a new board](./CONTRIBUTING.md#adding-a-new-board) in `CONTRIBUTING.md` if you want to submit it yourself.
+If there is another nRF52840-based Meshtastic board you would like to see supported, please [raise a GitHub issue](https://github.com/meshtastic/nRF52_Bootloader/issues/new/choose) — or see [Adding a new board](./CONTRIBUTING.md#adding-a-new-board) in `CONTRIBUTING.md` if you want to submit it yourself.
 
 ## BLE advertising names
 
@@ -126,7 +126,7 @@ When in OTA DFU mode, devices advertise using a board-specific name rather than 
 ## Installation
 
 The recommended way to install the bootloader is using the UF2 file.  
-Download the UF2 file for your board (they can be found in the [releases](https://github.com/meshtastic/nrf52-bootloader/releases) with filenames beginning with `update-`), enter UF2 mode (usually by double pressing the reset button within 0.5s; boards with no reset button hold their one button instead, see the [single-button note](#notes-on-single-button-boards-t1000-e-and-meshtracker-x1)) and copy the UF2 file across.
+Download the UF2 file for your board (they can be found in the [releases](https://github.com/meshtastic/nRF52_Bootloader/releases) with filenames beginning with `update-`), enter UF2 mode (usually by double pressing the reset button within 0.5s; boards with no reset button hold their one button instead, see the [single-button note](#notes-on-single-button-boards-t1000-e-and-meshtracker-x1)) and copy the UF2 file across.
 
 Any board can also be put into UF2 mode from the application, with no button at all: `meshtastic --enter-dfu` over USB, or the Meshtastic Android app's firmware-update screen on a USB connection.
 
@@ -138,7 +138,7 @@ If an incorrect bootloader has been flashed to the device, a full bootloader and
 
 ### Factory erase
 
-To wipe the device's saved data — config, node DB, keys, BLE bonds — without a serial terminal or a special erase firmware: enter UF2 mode and copy [`meshtastic_factory_erase.uf2`](./tools/meshtastic_factory_erase.uf2) (also attached to every [release](https://github.com/meshtastic/nrf52-bootloader/releases)) onto the drive. The bootloader erases the application's data region, then reboots straight back into UF2 mode so you can copy the firmware across next. The application itself is left in place, so if you unplug instead, it boots factory-fresh. Copy this file on its own: the drive detaches about half a second after the copy finishes (or as soon as you eject it) and comes back a second or two later.
+To wipe the device's saved data — config, node DB, keys, BLE bonds — without a serial terminal or a special erase firmware: enter UF2 mode and copy [`meshtastic_factory_erase.uf2`](./tools/meshtastic_factory_erase.uf2) (also attached to every [release](https://github.com/meshtastic/nRF52_Bootloader/releases)) onto the drive. The bootloader erases the application's data region, then reboots straight back into UF2 mode so you can copy the firmware across next. The application itself is left in place, so if you unplug instead, it boots factory-fresh. Copy this file on its own: the drive detaches about half a second after the copy finishes (or as soon as you eject it) and comes back a second or two later.
 
 The file is the same for every board. It is a single UF2 block with family ID `0x4D455348` and no payload; a bootloader that predates this feature ignores it silently — check `INFO_UF2.TXT` on the drive for a `Factory-Erase:` line to know whether yours supports it. Regenerate it with `tools/make_factory_erase_uf2.py` (or `make factory-erase-uf2`).
 
@@ -258,7 +258,7 @@ To leave DFU mode, eject the mounted drive: the bootloader exits DFU and boots t
 
 Unplugging is not a way out. The board stays in the bootloader on battery, with no LED on the X1 to show it, and plugging it back in only mounts the drive again. Eject the drive (or copy a `.uf2` across) to boot the application.
 
-Before OTAFIX 2.5 the T1000-E had no button path into DFU at all (the bootloader read the button with the wrong polarity), and an eject did not leave DFU. On those bootloaders, enter UF2 mode from the application instead: `meshtastic --enter-dfu` or the Meshtastic Android app; then install the file for your board from the [releases](https://github.com/meshtastic/nrf52-bootloader/releases) to get the button: `update-t1000_e_bootloader-*.uf2` on the T1000-E, `update-mesh_tracker_x1_bootloader-*.uf2` on the X1. The two boards share a USB VID/PID, which is what the bootloader's self-update check keys on, so it accepts the wrong board's file without complaint. Avoid the 1200 bps serial touch on these boards: it selects serial-only DFU (`DFU_MAGIC_SERIAL_ONLY_RESET`), which exposes no drive, has no eject to leave by, and the serial DFU protocol carries no reset request, so the only way out is completing a serial DFU with `adafruit-nrfutil`.
+Before OTAFIX 2.5 the T1000-E had no button path into DFU at all (the bootloader read the button with the wrong polarity), and an eject did not leave DFU. On those bootloaders, enter UF2 mode from the application instead: `meshtastic --enter-dfu` or the Meshtastic Android app; then install the file for your board from the [releases](https://github.com/meshtastic/nRF52_Bootloader/releases) to get the button: `update-t1000_e_bootloader-*.uf2` on the T1000-E, `update-mesh_tracker_x1_bootloader-*.uf2` on the X1. The two boards share a USB VID/PID, which is what the bootloader's self-update check keys on, so it accepts the wrong board's file without complaint. Avoid the 1200 bps serial touch on these boards: it selects serial-only DFU (`DFU_MAGIC_SERIAL_ONLY_RESET`), which exposes no drive, has no eject to leave by, and the serial DFU protocol carries no reset request, so the only way out is completing a serial DFU with `adafruit-nrfutil`.
 
 ---
 
@@ -272,7 +272,7 @@ together.
 ## Getting help
 
 - **Questions or troubleshooting:** [Meshtastic Discussions](https://github.com/orgs/meshtastic/discussions)
-- **Bug reports and feature requests:** [open an issue](https://github.com/meshtastic/nrf52-bootloader/issues/new/choose)
+- **Bug reports and feature requests:** [open an issue](https://github.com/meshtastic/nRF52_Bootloader/issues/new/choose)
 - **Security vulnerabilities:** see [`SECURITY.md`](./SECURITY.md) — please do not open a public issue
 - **General Meshtastic docs:** [meshtastic.org](https://meshtastic.org/)
 

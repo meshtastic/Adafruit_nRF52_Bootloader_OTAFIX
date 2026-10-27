@@ -47,9 +47,9 @@ signals that exist.
 
 The [README's board list](./README.md#boards-supported) says to raise an
 issue for a board you'd like supported — that's still the right first step,
-and [#4](https://github.com/meshtastic/nrf52-bootloader/issues/4)
+and [#4](https://github.com/meshtastic/nRF52_Bootloader/issues/4)
 and
-[#5](https://github.com/meshtastic/nrf52-bootloader/issues/5)
+[#5](https://github.com/meshtastic/nRF52_Bootloader/issues/5)
 are open examples. To actually submit the board yourself:
 
 1. You need the physical hardware to test on — a bootloader that compiles
