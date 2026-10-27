@@ -58,9 +58,9 @@
 //--------------------------------------------------------------------+
 // UF2
 //--------------------------------------------------------------------+
-#define UF2_PRODUCT_NAME        "Meshtastic"
+#define UF2_PRODUCT_NAME        "Meshtastic Generic"
 #define UF2_VOLUME_LABEL        "MESHBOOT"
-#define UF2_BOARD_ID            "Meshtastic"
+#define UF2_BOARD_ID            "nRF52840-Meshtastic-Generic-S140v7"
 #define UF2_INDEX_URL           "https://github.com/meshtastic/firmware.git"
 
 
