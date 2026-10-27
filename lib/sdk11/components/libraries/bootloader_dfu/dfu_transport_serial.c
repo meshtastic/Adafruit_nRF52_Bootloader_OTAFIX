@@ -18,6 +18,7 @@
 #include "app_util.h"
 #include "hci_transport.h"
 #include "app_timer.h"
+#include "bootloader.h"
 #include "app_scheduler.h"
 #include "boards.h"
 
@@ -200,6 +201,7 @@ static void process_dfu_packet(void * p_event_data, uint16_t event_size)
     // Adafruit modification for startup dfu
     extern bool dfu_startup_packet_received;
     dfu_startup_packet_received = true;
+    dfu_activity();
 
     while (false == DATA_QUEUE_EMPTY())
     {

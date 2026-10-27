@@ -24,7 +24,54 @@
 
 #include "boards.h"
 
-#if defined(DISPLAY_PIN_SCK)
+#ifdef BOARD_HAS_DISPLAY
+
+// Four-line layout (title, mode, version, banner) for 1bpp panels; a board
+// can override any of it.
+#ifdef DISPLAY_MONO
+#if DISPLAY_HEIGHT < 96
+// Three 32x32 icons need 96x32; that plus four text lines does not fit.
+#define DISPLAY_NO_DRAG_ICONS
+#define NOLABELS
+#endif
+
+#ifndef FONT_SIZE_LARGE
+#define FONT_SIZE_LARGE      2
+#endif
+#ifndef BANNER_TEXT
+#define BANNER_TEXT          "meshtastic.org"
+#endif
+
+// The bars draw dark in mono: bar 1 spans the panel and the others collapse.
+#ifndef SCREEN_BAR1_Y
+#define SCREEN_BAR1_Y        0
+#endif
+#ifndef SCREEN_BAR1_H
+#define SCREEN_BAR1_H        DISPLAY_HEIGHT
+#endif
+#ifndef SCREEN_BAR2_H
+#define SCREEN_BAR2_H        0
+#endif
+#ifndef SCREEN_BAR3_H
+#define SCREEN_BAR3_H        0
+#endif
+
+#ifndef DISPLAY_TITLE_Y
+#define DISPLAY_TITLE_Y      0
+#endif
+#ifndef DRAG_TEXT_Y
+#define DRAG_TEXT_Y          22
+#endif
+#ifndef BLE_OTA_Y
+#define BLE_OTA_Y            22
+#endif
+#ifndef UF2_VERSION_BASE_Y
+#define UF2_VERSION_BASE_Y   44
+#endif
+#ifndef BANNER_TEXT_Y
+#define BANNER_TEXT_Y        55
+#endif
+#endif // DISPLAY_MONO
 
 #ifndef BANNER_TEXT
 #define BANNER_TEXT "meshtastic.org - OTAFIX by oltaco"
@@ -121,6 +168,13 @@ const uint16_t palette[] = {
 #ifndef BLE_OTA_Y
 #define BLE_OTA_Y            65
 #endif
+// Mode line on the drag screen, for panels too short for the 32px icon row.
+#ifndef DRAG_TEXT_Y
+#define DRAG_TEXT_Y          BLE_OTA_Y
+#endif
+#ifndef DRAG_TEXT
+#define DRAG_TEXT            "USB UF2"
+#endif
 #ifndef FONT_SIZE_LARGE
 #define FONT_SIZE_LARGE      4
 #endif
@@ -129,6 +183,11 @@ const uint16_t palette[] = {
 // TODO only buffer partial screen to save SRAM
 // ESP32s2 can only statically allocated DRAM up to 160KB.
 // the remaining 160KB can only be allocated at runtime as heap.
+#ifdef DISPLAY_MONO
+_Static_assert(DISPLAY_HEIGHT % 8 == 0,
+               "mono panels are addressed in 8-row pages; DISPLAY_HEIGHT must be a multiple of 8");
+#endif
+
 static uint8_t frame_buf[DISPLAY_WIDTH * DISPLAY_HEIGHT];
 //static uint8_t* frame_buf;
 
@@ -155,11 +214,17 @@ static void printch(int x, int y, int color, const uint8_t* fnt, int size) {
   }
 }
 
+#ifndef DISPLAY_NO_DRAG_ICONS
 // print icon
 static void printicon(int x, int y, int color, const uint8_t* icon) {
   int w = *icon++;
   int h = *icon++;
   int sz = *icon++;
+
+  // The decode loop does not clip.
+  if (x < 0 || y < 0 || x + w > DISPLAY_WIDTH || y + h > DISPLAY_HEIGHT) {
+    return;
+  }
 
   uint8_t mask = 0x80;
   int runlen = 0;
@@ -201,6 +266,7 @@ static void printicon(int x, int y, int color, const uint8_t* icon) {
     }
   }
 }
+#endif // DISPLAY_NO_DRAG_ICONS
 
 static void print(int x, int y, int color, const char* text, int size) {
   // Glyphs are written straight into frame_buf with no bounds check of
@@ -221,8 +287,10 @@ static void print(int x, int y, int color, const char* text, int size) {
   }
 }
 
-static inline void print_centered(int y, int color, const char* text, int size) {
+// Steps the size down until the text fits the panel width.
+static void print_centered(int y, int color, const char* text, int size) {
   int len = (int) strlen(text);
+  while (size > 1 && TEXT_WIDTH(size, len) > DISPLAY_WIDTH) size--;
   int text_x = (DISPLAY_WIDTH - TEXT_WIDTH(size, len)) / 2;
   print(text_x >= 0 ? text_x : 0, y, color, text, size);
 }
@@ -231,7 +299,41 @@ static inline void print_centered(int y, int color, const char* text, int size) 
 //
 //--------------------------------------------------------------------+
 
-static void draw_screen(uint8_t const* fb) {
+#ifdef DISPLAY_MONO
+
+// Only white (text, icons) and purple (version) light a pixel; the bar
+// colors stay dark.
+#define MONO_LIT_MASK   ((1u << COLOR_WHITE) | (1u << COLOR_PURPLE))
+
+// Sends only the pages covering rows y0..y1.
+static void draw_screen(uint8_t const* fb, int y0, int y1) {
+  // SSD1306/SH1106 GDDRAM is paged: one byte spans 8 rows of a single
+  // column, LSB topmost. frame_buf is already column-major, so each output
+  // byte gathers 8 contiguous bytes of it.
+  for (int page = y0 / 8; page <= y1 / 8; ++page) {
+    uint8_t line[DISPLAY_WIDTH];
+
+    for (int x = 0; x < DISPLAY_WIDTH; ++x) {
+      uint8_t const* col = fb + x * DISPLAY_HEIGHT + page * 8;
+      uint8_t bits = 0;
+      for (int bit = 0; bit < 8; ++bit) {
+        if (MONO_LIT_MASK & (1u << (col[bit] & 0xf))) {
+          bits |= (uint8_t) (1u << bit);
+        }
+      }
+      line[x] = bits;
+    }
+
+    board_display_draw_page((uint8_t) page, line, sizeof(line));
+  }
+}
+
+#else
+
+// Always sends the whole frame; lines are columns, so rows cannot be cropped.
+static void draw_screen(uint8_t const* fb, int y0, int y1) {
+  (void) y0;
+  (void) y1;
   uint8_t const* p = fb;
   for (int y = 0; y < DISPLAY_WIDTH; ++y) {
     uint8_t cc[DISPLAY_HEIGHT * 2];
@@ -246,24 +348,57 @@ static void draw_screen(uint8_t const* fb) {
   }
 }
 
+#endif
+
 // draw color bar
-static void drawBar(int y, int h, int color) {
-  for (int x = 0; x < DISPLAY_WIDTH; ++x) {
+static void drawBar(int y, int h, int color, int w) {
+  // The default bar geometry assumes a 240x135 panel.
+  if (y < 0) {
+    h += y;
+    y = 0;
+  }
+  if (y >= DISPLAY_HEIGHT || h <= 0) {
+    return;
+  }
+  if (y + h > DISPLAY_HEIGHT) {
+    h = DISPLAY_HEIGHT - y;
+  }
+
+  for (int x = 0; x < w; ++x) {
     memset(frame_buf + x * DISPLAY_HEIGHT + y, color, h);
   }
 }
 
-// draw drag & drop screen
-void screen_draw_drag(void) {
-  drawBar(SCREEN_BAR1_Y, SCREEN_BAR1_H, COLOR_GREEN);
-  drawBar(SCREEN_BAR2_Y, SCREEN_BAR2_H, COLOR_BLUE);
-  drawBar(SCREEN_BAR3_Y, SCREEN_BAR3_H, COLOR_ORANGE);
+static char const* _title; // NULL shows DISPLAY_TITLE
+static int _pct = -1;
+static bool _ble;
+static bool _shown;
 
-  // Print title, version, banner.
-  print_centered(DISPLAY_TITLE_Y, COLOR_WHITE, DISPLAY_TITLE, FONT_SIZE_LARGE);
+#define ALL_ROWS  0, DISPLAY_HEIGHT - 1
+
+// Renders the whole frame and sends rows y0..y1 of it.
+static void draw(int y0, int y1) {
+  _shown = true;
+  drawBar(SCREEN_BAR1_Y, SCREEN_BAR1_H, COLOR_GREEN, DISPLAY_WIDTH);
+  drawBar(SCREEN_BAR2_Y, SCREEN_BAR2_H, COLOR_BLUE, DISPLAY_WIDTH);
+  drawBar(SCREEN_BAR3_Y, SCREEN_BAR3_H, COLOR_ORANGE, DISPLAY_WIDTH);
+
+  print_centered(DISPLAY_TITLE_Y, COLOR_WHITE, _title ? _title : DISPLAY_TITLE, FONT_SIZE_LARGE);
   print_centered(UF2_VERSION_BASE_Y, COLOR_PURPLE, UF2_VERSION_BASE, 1);
-  print_centered(BANNER_TEXT_Y, COLOR_WHITE, BANNER_TEXT, 1);
+  if (_pct < 0) {
+    print_centered(BANNER_TEXT_Y, COLOR_WHITE, BANNER_TEXT, 1);
+  } else {
+    // The banner line becomes the progress bar, over a full-width baseline.
+    drawBar(BANNER_TEXT_Y + 7, 1, COLOR_WHITE, DISPLAY_WIDTH);
+    drawBar(BANNER_TEXT_Y, 8, COLOR_WHITE, DISPLAY_WIDTH * _pct / 100);
+  }
 
+  if (_ble) {
+    print_centered(BLE_OTA_Y, COLOR_WHITE, "BLE OTA", FONT_SIZE_LARGE);
+  } else {
+#ifdef DISPLAY_NO_DRAG_ICONS
+  print_centered(DRAG_TEXT_Y, COLOR_WHITE, DRAG_TEXT, FONT_SIZE_LARGE);
+#else
 #ifndef DRAG
 #define DRAG 70
 #endif
@@ -277,22 +412,35 @@ void screen_draw_drag(void) {
   print(22, DRAG - 12, COLOR_WHITE, "firmware.uf2", 1);
   print(160, DRAG - 12, COLOR_WHITE, UF2_VOLUME_LABEL, 1);
   #endif // NOLABELS
+#endif // DISPLAY_NO_DRAG_ICONS
+  }
 
-  draw_screen(frame_buf);
+  draw_screen(frame_buf, y0, y1);
+}
+
+void screen_draw_drag(void) {
+  _ble = false;
+  draw(ALL_ROWS);
 }
 
 void screen_draw_ble(void) {
-  drawBar(SCREEN_BAR1_Y, SCREEN_BAR1_H, COLOR_GREEN);
-  drawBar(SCREEN_BAR2_Y, SCREEN_BAR2_H, COLOR_BLUE);
-  drawBar(SCREEN_BAR3_Y, SCREEN_BAR3_H, COLOR_ORANGE);
+  _ble = true;
+  draw(ALL_ROWS);
+}
 
-  // Print title, version, OTA, banner
-  print_centered(DISPLAY_TITLE_Y, COLOR_WHITE, DISPLAY_TITLE, FONT_SIZE_LARGE);
-  print_centered(UF2_VERSION_BASE_Y, COLOR_PURPLE, UF2_VERSION_BASE, 1);
-  print_centered(BLE_OTA_Y, COLOR_WHITE, "BLE OTA", FONT_SIZE_LARGE);
-  print_centered(BANNER_TEXT_Y, COLOR_WHITE, BANNER_TEXT, 1);
+void screen_set_title(char const* title) {
+  if (title == _title) return;
+  _title = title;
+  if (_shown) draw(ALL_ROWS);
+}
 
-  draw_screen(frame_buf);
+// Redraws in 5% steps.
+void screen_set_progress(uint32_t done, uint32_t total) {
+  if (!_shown || total == 0 || total == 0xffffffff || done > total) return;
+  int pct = (int) (done * 100 / total);
+  if (_pct >= 0 && pct / 5 == _pct / 5) return;
+  _pct = pct;
+  draw(BANNER_TEXT_Y, BANNER_TEXT_Y + 7);
 }
 
 #endif

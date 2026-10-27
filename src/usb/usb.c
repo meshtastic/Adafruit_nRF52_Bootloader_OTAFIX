@@ -27,6 +27,9 @@
 #include "nrf_sdm.h"
 #include "nrf_soc.h"
 
+#include "app_timer.h"
+#include "bootloader.h"
+
 #include "nrf_usbd.h"
 #include "tusb.h"
 #include "usb_desc.h"
@@ -97,9 +100,10 @@ void usb_init(bool cdc_only) {
   uf2_init();
   tusb_init();
 
-  #ifdef DISPLAY_PIN_SCK
-  board_display_init();
-  screen_draw_drag();
+  #ifdef BOARD_HAS_DISPLAY
+  if (board_display_init()) {
+    screen_draw_drag();
+  }
   #endif
 }
 
@@ -111,10 +115,44 @@ void usb_teardown(void) {
 //--------------------------------------------------------------------+
 // tinyusb callbacks
 //--------------------------------------------------------------------+
+static bool _host_mounted;
+
+bool usb_host_mounted(void) {
+  return _host_mounted;
+}
+
 void tud_mount_cb(void) {
+  _host_mounted = true;
+  dfu_activity();
   led_state(STATE_USB_MOUNTED);
+}
+
+// Cable pulled with no app to boot: end the session so main resets to the BLE OTA wait.
+#define VBUS_LOSS_DELAY_MS 250
+APP_TIMER_DEF(_vbus_loss_timer);
+static bool _vbus_loss_timer_created;
+
+static bool vbus_lost_without_app(void) {
+  return !(NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk) && !bootloader_app_is_valid();
+}
+
+static void vbus_loss_timer_handler(void *p_context) {
+  (void) p_context;
+  if (vbus_lost_without_app()) {
+    dfu_update_status_t update_status = { .status_code = DFU_RESET };
+    bootloader_dfu_update_process(update_status);
+  }
 }
 
 void tud_umount_cb(void) {
   led_state(STATE_USB_UNMOUNTED);
+
+  if (vbus_lost_without_app()) {
+    if (!_vbus_loss_timer_created) {
+      app_timer_create(&_vbus_loss_timer, APP_TIMER_MODE_SINGLE_SHOT, vbus_loss_timer_handler);
+      _vbus_loss_timer_created = true;
+    }
+    app_timer_stop(_vbus_loss_timer);
+    app_timer_start(_vbus_loss_timer, APP_TIMER_TICKS(VBUS_LOSS_DELAY_MS), NULL);
+  }
 }

@@ -34,11 +34,7 @@
 #include "dfu_ble_svc_internal.h"
 #include "nrf_delay.h"
 #include "sdk_common.h"
-
-
-#define BLEGAP_EVENT_LENGTH             6
-#define BLEGATT_ATT_MTU_MAX             247
-enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
+#include "ble_dfu_cfg.h"
 
 #define DFU_REV_MAJOR                        0x00                                                    /** DFU Major revision number to be exposed. */
 #define DFU_REV_MINOR                        0x08                                                    /** DFU Minor revision number to be exposed. */
@@ -51,15 +47,14 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 #define DEVICE_NAME                          "AdaDFU"                                                /**< Name of device. Will be included in the advertising data. */
 #endif //DEVICE_NAME
 
-#define MIN_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(10, UNIT_1_25_MS))             /**< Minimum acceptable connection interval (11.25 milliseconds). */
-#define MAX_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(30, UNIT_1_25_MS))             /**< Maximum acceptable connection interval (15 milliseconds). */
+#define MIN_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(10, UNIT_1_25_MS))             /**< Minimum acceptable connection interval (10 milliseconds). */
+#define MAX_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(30, UNIT_1_25_MS))             /**< Maximum acceptable connection interval (30 milliseconds). */
 #define SLAVE_LATENCY                        0                                                       /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                     (4 * 100)                                               /**< Connection supervisory timeout (4 seconds). */
 
 #define APP_ADV_INTERVAL                     MSEC_TO_UNITS(25, UNIT_0_625_MS)                        /**< The advertising interval (25 ms.). */
 #define APP_ADV_TIMEOUT                      BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED                   /**< The advertising timeout in units of seconds. This is set to @ref BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED so that the advertisement is done as long as there there is a call to @ref dfu_transport_close function.*/
 #define APP_DIRECTED_ADV_TIMEOUT             50                                                       /**< number of direct advertisement (each lasting 1.28seconds). */
-#define PEER_ADDRESS_TYPE_INVALID            0xFF                                                    /**< Value indicating that no valid peer address exists. This will be the case when a private resolvable address is used in which case there is no address available but instead an IRK is present. */
 #define PEER_ADDRESS_TYPE_INVALID            0xFF                                                    /**< Value indicating that no valid peer address exists. This will be the case when a private resolvable address is used in which case there is no address available but instead an IRK is present. */
 
 #define SEC_PARAM_TIMEOUT                    30                                                      /**< Timeout for Pairing Request or Security Request (in seconds). */
@@ -501,6 +496,24 @@ static void accum_flush(ble_dfu_t * p_dfu)
     m_accum_bytes_pending = 0;
 }
 
+/**@brief     Drops the unfinished transfer so the next connection can start over. */
+static void session_reset(void)
+{
+    dfu_reset_session();
+    (void) hci_mem_pool_open();
+
+    m_num_of_firmware_bytes_rcvd = 0;
+    m_pkt_notif_target           = 0;
+    m_pkt_notif_target_cnt       = 0;
+    m_pkt_rcpt_notif_enabled     = false;
+    m_pkt_type                   = PKT_TYPE_INVALID;
+    mp_final_packet              = NULL;
+    m_accum_len                  = 0;
+    m_accum_active               = false;
+    m_accum_bytes_pending        = 0;
+    m_reported_image_size        = 0;
+}
+
 /**@brief     Function for processing application data written by the peer to the DFU Packet
  *            Characteristic.
  *
@@ -694,6 +707,8 @@ static void on_dfu_evt(ble_dfu_t * p_dfu, ble_dfu_evt_t * p_evt)
 {
     uint32_t           err_code;
     ble_dfu_resp_val_t resp_val;
+
+    dfu_activity();
 
     switch (p_evt->ble_dfu_evt_type)
     {
@@ -910,6 +925,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
+            dfu_activity();
             m_conn_handle    = p_ble_evt->evt.gap_evt.conn_handle;
             m_is_advertising = false;
 
@@ -939,6 +955,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
                 // disconnect triggered by the DFU Controller before the firmware update was
                 // complete).
                 // Restart advertising so that the DFU Controller can reconnect if possible.
+                session_reset();
                 advertising_start();
             }
 

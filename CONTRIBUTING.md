@@ -7,9 +7,8 @@ recover — so a few things here are stricter than a typical repo.
 ## Before you start
 
 - **Read [`AGENTS.md`](./AGENTS.md) first.** It covers the board abstraction,
-  the build system split (`make` vs. the incomplete `CMakeLists.txt`), the
-  vendored submodules, and a list of known gotchas. This file covers
-  process; that one covers the code.
+  the build, the vendored submodules, and a list of known gotchas. This file
+  covers process; that one covers the code.
 - **New board support needs real hardware.** `UF2_BOARD_ID`, VID/PID, and
   pin definitions cannot be guessed from a datasheet alone — see
   [Adding a new board](#adding-a-new-board) below.
@@ -40,10 +39,6 @@ Board names are the directory names under `src/boards/`. `tools/build_all.py`
 builds every board and prints a pass/fail + size table — run it before
 opening a PR; it's the same check CI's board matrix does per-PR, just local.
 
-**Use `make`, not `cmake`.** `CMakeLists.txt` only has a `board.cmake` for 4
-of the 18 boards; `cmake -DBOARD=<anything else>` fails outright. Nobody
-uses the CMake path in practice.
-
 There is no lint or test suite — for a bootloader, "does it compile for
 every board" (CI's job) and real hardware testing are the correctness
 signals that exist.
@@ -52,9 +47,9 @@ signals that exist.
 
 The [README's board list](./README.md#boards-supported) says to raise an
 issue for a board you'd like supported — that's still the right first step,
-and [#4](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/issues/4)
+and [#4](https://github.com/meshtastic/nRF52_Bootloader/issues/4)
 and
-[#5](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/issues/5)
+[#5](https://github.com/meshtastic/nRF52_Bootloader/issues/5)
 are open examples. To actually submit the board yourself:
 
 1. You need the physical hardware to test on — a bootloader that compiles

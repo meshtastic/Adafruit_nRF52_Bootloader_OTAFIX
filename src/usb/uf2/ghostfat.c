@@ -35,6 +35,8 @@
 
 #include "bootloader_settings.h"
 #include "bootloader.h"
+#include "boards.h"
+#include "fault_record.h"
 
 //--------------------------------------------------------------------+
 //
@@ -131,10 +133,11 @@ STATIC_ASSERT(FAT_ENTRIES_PER_SECTOR                       ==       256); // FAT
     "Date: " __DATE__ "\r\n" \
     "Factory-Erase: UF2 family 0x4D455348\r\n"
 
-char infoUf2File[128*3] = INFO_UF2_TEXT;
-// uf2_init() appends "SoftDevice: S140 7.3.0\r\n" at runtime; 40 covers the
-// widest values the id/version fields can print
-STATIC_ASSERT(sizeof(INFO_UF2_TEXT) + 40 <= sizeof(infoUf2File));
+static const char infoUf2Text[] = INFO_UF2_TEXT;
+char infoUf2File[128*3];
+// uf2_init() appends "SoftDevice: S140 7.3.0\r\n" (40 covers the widest id/version
+// fields) and "Last-Fault: id=0x<8> pc=0x<8> info=0x<8>\r\n" (57 bytes)
+STATIC_ASSERT(sizeof(INFO_UF2_TEXT) + 40 + 57 <= sizeof(infoUf2File));
 
 const char indexFile[] =
     "<!doctype html>\n"
@@ -308,6 +311,7 @@ static inline bool in_uicr_space(uint32_t addr)
 
 void uf2_init(void)
 {
+  strcpy(infoUf2File, infoUf2Text);
   strcat(infoUf2File, "SoftDevice: ");
 
   if ( is_sd_existed() )
@@ -341,6 +345,22 @@ void uf2_init(void)
   }else
   {
     strcat(infoUf2File, "not found\r\n");
+  }
+
+  if (g_fault_record.magic == FAULT_RECORD_MAGIC)
+  {
+    char str[10];
+    strcat(infoUf2File, "Last-Fault: id=0x");
+    utoa(g_fault_record.id, str, 16);
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, " pc=0x");
+    utoa(g_fault_record.pc, str, 16);
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, " info=0x");
+    utoa(g_fault_record.info, str, 16);
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, "\r\n");
+    g_fault_record.magic = 0;
   }
 }
 
@@ -460,9 +480,8 @@ void read_block(uint32_t block_no, uint8_t *data) {
 /**
  * Write an uf2 block wrapped by 512 sector.
  * @return number of bytes processed, only 3 following values
- *  -1 : if not an uf2 block
- * 512 : write is successful (BPB_SECTOR_SIZE == 512)
- *   0 : is busy with flashing, tinyusb stack will call write_block again with the same parameters later on
+ *  -1 : if not an uf2 block, or the block is rejected
+ * 512 : otherwise (BPB_SECTOR_SIZE == 512)
  */
 int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
 {
@@ -493,8 +512,29 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
        *                         |     MBR     |       |     MBR     |
        *                          -------------         -------------
        */
+      // An image carrying a SoftDevice starts at or below its first page; an app-only image must
+      // start exactly at the app start. One built for another SoftDevice starts above or below it,
+      // so every block of that file is rejected and nothing is written. Block 0 opens a new file
+      // whatever its address (an MBR block at 0x0 included). Assumes the host writes front to back.
+      if ( bl->blockNo == 0 )
+      {
+        state->sd_start_seen = false;
+        state->wrong_layout = (bl->targetAddr > DFU_BANK_0_REGION_START);
+      }
       if ( in_app_space(bl->targetAddr) )
       {
+        if ( bl->targetAddr == USER_FLASH_START ) state->sd_start_seen = true;
+        if ( !state->sd_start_seen && bl->targetAddr < DFU_BANK_0_REGION_START ) state->wrong_layout = true;
+        if ( state->wrong_layout ) goto reject;
+
+        screen_set_title(NULL); // a good block after a rejected one clears WRONG FILE
+        if ( !state->app_invalidated )
+        {
+          // A cable pulled mid-copy must not leave the old bank_0 valid over a half-written image.
+          dfu_update_status_t s = { .status_code = DFU_BANK_0_ERASED };
+          bootloader_dfu_update_process(s);
+          state->app_invalidated = true;
+        }
         PRINTF("Write addr = 0x%08lX, block = %ld (%ld of %ld)\r\n", bl->targetAddr, bl->blockNo, state->numWritten, bl->numBlocks);
         flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
         if ( bl->targetAddr + bl->payloadSize > state->appEnd ) state->appEnd = bl->targetAddr + bl->payloadSize;
@@ -505,7 +545,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
         PRINTF("skip writing to MBR\r\n");
       }else
       {
-        return -1;
+        goto reject;
       }
     break;
 
@@ -521,8 +561,8 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
        * - Along with bootloader code, UCIR (at 0x1000100) is also included containing
        * 0x10001014 (bootloader address), and 0x10001018 (MBR Params address).
        *
-       * Note: part of the existing application can be affected when updating bootloader.
-       * TODO May be worth to have some kind crc/application integrity checking
+       * Note: staging overwrites the application tail above BOOTLOADER_ADDR_NEW_RECIEVED, so an
+       * application that reaches it is invalidated before the first staged write.
        *
        *                         -------------         -------------         -------------
        *                        |             |       |             |     + |     New     |
@@ -543,6 +583,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       PRINTF("addr = 0x%08lX, block = %ld (%ld of %ld)\r\n", bl->targetAddr, bl->blockNo, state->numWritten, bl->numBlocks);
 
       state->update_bootloader = true;
+      screen_set_title("BOOTLOADER");
       if ( in_uicr_space(bl->targetAddr) )
       {
         /* UCIR contains bootloader & MBR address as follow:
@@ -567,7 +608,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
           PRINT_HEX(uicr_mbr_param);
 
           state->aborted = true;
-          return -1;
+          goto reject;
         }
 
         state->has_uicr = true;
@@ -599,9 +640,28 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
               {
                 PRINTF("DOES NOT match our VID/PID\r\n");
                 state->aborted = true;
-                return -1;
+                goto reject;
               }
             }
+          }
+        }
+
+        // Staging overwrites the application tail: invalidate an oversize app before the first staged write.
+        if ( !state->app_invalidated )
+        {
+          bootloader_settings_t const * boot_setting;
+          bootloader_util_settings_get(&boot_setting);
+
+          // A size spanning the whole region is the CURRENT.UF2 full-region fallback, not a measured
+          // application end, so it is treated as unknown like current_flash_size() does.
+          uint32_t const sz = boot_setting->bank_0_size;
+          if ( boot_setting->bank_0 == BANK_VALID_APP && sz != 0 && sz != 0xFFFFFFFFUL &&
+               sz < USER_FLASH_END - DFU_BANK_0_REGION_START &&
+               sz > BOOTLOADER_ADDR_NEW_RECIEVED - DFU_BANK_0_REGION_START )
+          {
+            dfu_update_status_t s = { .status_code = DFU_BANK_0_ERASED };
+            bootloader_dfu_update_process(s);
+            state->app_invalidated = true;
           }
         }
 
@@ -623,7 +683,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       else
       {
         state->aborted = true;
-        return -1;
+        goto reject;
       }
     break;
 
@@ -632,10 +692,11 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       // msc_uf2.c once the host has acknowledged the write.
       PRINTF("Factory erase requested\r\n");
       state->factory_erase = true;
+      screen_set_title("ERASE");
     break;
 
     // unknown family ID
-    default: return -1;
+    default: goto reject;
   }
 
   //------------- Update written blocks -------------//
@@ -660,6 +721,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       {
         state->writtenMask[pos] |= mask;
         state->numWritten++;
+        screen_set_progress(state->numWritten, state->numBlocks);
       }
 
       // flush last blocks
@@ -678,4 +740,9 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
   }
 
   return BPB_SECTOR_SIZE;
+
+  // A UF2 block this board cannot take: another family, board or address.
+reject:
+  screen_set_title("WRONG FILE");
+  return -1;
 }

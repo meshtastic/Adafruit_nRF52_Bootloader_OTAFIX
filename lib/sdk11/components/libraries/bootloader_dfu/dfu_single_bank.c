@@ -108,6 +108,7 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
         if (dfu_image_page_count < 1) dfu_image_page_count = 1; // This should not happen
 
         static uint8_t dfu_page_erased_static[256];
+        _Static_assert(sizeof(dfu_page_erased_static) >= (BOOTLOADER_REGION_START - MBR_SIZE - DFU_APP_DATA_RESERVED) / CODE_PAGE_SIZE, "lazy-erase page map smaller than the app region");
         dfu_page_erased = dfu_page_erased_static;
         memset(dfu_page_erased, 0, dfu_image_page_count);
 
@@ -332,6 +333,7 @@ uint32_t dfu_start_pkt_handle(dfu_update_packet_t * p_packet)
 
     if ( DFU_STATE_IDLE != m_dfu_state ) return NRF_ERROR_INVALID_STATE;
 
+    if (IS_UPDATING_BL(m_start_packet)) screen_set_title("BOOTLOADER");
     m_functions.prepare(m_image_size);
 
     return NRF_SUCCESS;
@@ -388,6 +390,7 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
             }
 
             m_data_received += data_length;
+            screen_set_progress(m_data_received, m_image_size);
 
             if (m_data_received != m_image_size)
             {
@@ -528,6 +531,23 @@ uint32_t dfu_image_activate()
     }
 
     return err_code;
+}
+
+
+void dfu_reset_session(void)
+{
+    if (m_dfu_state == DFU_STATE_IDLE || m_dfu_state == DFU_STATE_INIT_ERROR) return;
+
+    // Issued flash ops finish on their own: a stale store is dropped by the RX_DATA_PKT gate, and a
+    // stale clear can only report a page that is erased and queued ahead of every new store.
+    pstorage_discard_pending();
+
+    dfu_page_erased      = NULL;
+    dfu_image_page_count = 0;
+    m_init_packet_length = 0;
+    m_image_crc          = 0;
+    m_data_received      = 0;
+    m_dfu_state          = DFU_STATE_IDLE;
 }
 
 

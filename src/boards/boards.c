@@ -159,7 +159,7 @@ void board_teardown(void) {
   neopixel_teardown();
 #endif
 
-#ifdef DISPLAY_PIN_SCK
+#ifdef BOARD_HAS_DISPLAY
   board_display_teardown();
 #endif
 
@@ -238,7 +238,7 @@ static void tft_cmd(uint8_t cmd, uint8_t const* data, size_t narg) {
   tft_cs(true);
 }
 
-void board_display_init(void) {
+bool board_display_init(void) {
   //------------- SPI init -------------//
   // highspeed SPIM should set SCK and MOSI to high drive
   nrf_gpio_cfg(DISPLAY_PIN_SCK, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_CONNECT,
@@ -277,6 +277,9 @@ void board_display_init(void) {
 #endif
 
   tft_controller_init();
+
+  // A soldered-on TFT is always present; nothing here can fail.
+  return true;
 }
 
 void board_display_teardown(void) {
@@ -929,3 +932,268 @@ static void tft_controller_init(void) {
 }
 
 #endif
+//--------------------------------------------------------------------+
+// Display controller - I2C mono OLED (SSD1306 / SH1106)
+//--------------------------------------------------------------------+
+// The OLED is often an optional plug-in module, so every transfer is bounded
+// and a missing panel only means no picture.
+
+#ifdef DISPLAY_PIN_SDA
+#include "nrf_twim.h"
+
+// Tried first, then the other strap position (0x3C <-> 0x3D).
+#ifndef DISPLAY_I2C_ADDR
+#define DISPLAY_I2C_ADDR      0x3C
+#endif
+
+// Used only when the status byte read at init is inconclusive.
+#ifdef DISPLAY_CONTROLLER_SH1106
+#define DISPLAY_SH1106_HINT   true
+#else
+#define DISPLAY_SH1106_HINT   false
+#endif
+
+// Blanking width: an SH1106's 132 columns, which hold undefined data at
+// power-up even outside the glass.
+#ifndef DISPLAY_GDDRAM_WIDTH
+#define DISPLAY_GDDRAM_WIDTH  (DISPLAY_WIDTH + 4)
+#endif
+
+#ifndef DISPLAY_CONTRAST
+#define DISPLAY_CONTRAST      0xCF
+#endif
+
+// Rail settle time before the first transfer, in ms.
+#ifndef DISPLAY_POWER_ON_MS
+#define DISPLAY_POWER_ON_MS   100
+#endif
+
+// TWIM0 is the same peripheral ID as SPIM0, which the TFT path uses; boards.h
+// rejects a board.h that asks for both.
+#define _twim NRF_TWIM0
+
+// I2C control bytes: Co=0, D/C# selects the command or data stream.
+#define OLED_CTRL_CMD         0x00
+#define OLED_CTRL_DATA        0x40
+
+// Far beyond a full page at 400 kHz, so it only fires on a stuck bus.
+#define TWI_GUARD_LOOPS       2000000UL
+
+static bool _display_present = false;
+static bool _sh1106 = false;
+static uint8_t _col_offset = 0;
+
+static bool oled_write_page(uint8_t page, uint8_t col, uint8_t const* buf, size_t nbytes);
+
+// Leaves the bus idle and the switched rail off, as it is out of reset.
+static bool display_init_failed(void) {
+  _display_present = false;
+  nrf_twim_disable(_twim);
+#if defined(DISPLAY_VSENSOR_PIN) && DISPLAY_VSENSOR_PIN >= 0
+  nrf_gpio_pin_write(DISPLAY_VSENSOR_PIN, !DISPLAY_VSENSOR_ON);
+#endif
+  return false;
+}
+
+static void twi_start(void) {
+  nrf_twim_event_clear(_twim, NRF_TWIM_EVENT_STOPPED);
+  nrf_twim_event_clear(_twim, NRF_TWIM_EVENT_ERROR);
+  (void) nrf_twim_errorsrc_get_and_clear(_twim);
+}
+
+static bool twi_finish(void);
+
+// Blocking write of a whole I2C transaction. Returns false on NACK, bus
+// error, or timeout, leaving the peripheral idle and ready for the next try.
+static bool twi_write(uint8_t const* buf, size_t len) {
+  twi_start();
+  nrf_twim_tx_buffer_set(_twim, buf, len);
+  nrf_twim_shorts_set(_twim, NRF_TWIM_SHORT_LASTTX_STOP_MASK);
+  nrf_twim_task_trigger(_twim, NRF_TWIM_TASK_STARTTX);
+  return twi_finish();
+}
+
+// Blocking read, same contract as twi_write.
+static bool twi_read(uint8_t* buf, size_t len) {
+  twi_start();
+  nrf_twim_rx_buffer_set(_twim, buf, len);
+  nrf_twim_shorts_set(_twim, NRF_TWIM_SHORT_LASTRX_STOP_MASK);
+  nrf_twim_task_trigger(_twim, NRF_TWIM_TASK_STARTRX);
+  return twi_finish();
+}
+
+static bool twi_finish(void) {
+  uint32_t guard = TWI_GUARD_LOOPS;
+  while (!nrf_twim_event_check(_twim, NRF_TWIM_EVENT_STOPPED) &&
+         !nrf_twim_event_check(_twim, NRF_TWIM_EVENT_ERROR) &&
+         --guard) {}
+
+  bool const ok = (guard != 0) && !nrf_twim_event_check(_twim, NRF_TWIM_EVENT_ERROR);
+
+  if (!ok) {
+    // RESUME before STOP, as nrfx does after an error.
+    nrf_twim_task_trigger(_twim, NRF_TWIM_TASK_RESUME);
+    nrf_twim_task_trigger(_twim, NRF_TWIM_TASK_STOP);
+    guard = TWI_GUARD_LOOPS;
+    while (!nrf_twim_event_check(_twim, NRF_TWIM_EVENT_STOPPED) && --guard) {}
+    (void) nrf_twim_errorsrc_get_and_clear(_twim);
+  }
+
+  return ok;
+}
+
+// EasyDMA can only read from RAM, so command lists must live on the stack,
+// never in flash.
+static bool oled_cmds(uint8_t* buf, size_t len) {
+  buf[0] = OLED_CTRL_CMD;
+  return twi_write(buf, len);
+}
+
+// False if nothing ACKs. Matches firmware's ScanI2CTwoWire::probeOLED, r
+// starting at 0 included: an SH1106 can read 0x00 first and 0x56 after.
+static bool oled_probe(bool* sh1106) {
+  uint8_t r = 0;
+  uint8_t prev;
+  uint8_t tries = 0;
+  do {
+    prev = r;
+    uint8_t ctrl[] = { OLED_CTRL_CMD };
+    if (!twi_write(ctrl, sizeof(ctrl))) {
+      if (tries == 0) return false;
+      break;
+    }
+    uint8_t status = 0;
+    if (!twi_read(&status, sizeof(status))) break;
+    r = status & 0x0F;
+  } while (r != prev && ++tries < 4);
+  if (r == 0x00 || r == 0x08) {
+    *sh1106 = true;
+  } else if (r >= 0x03 && r <= 0x07) {
+    *sh1106 = false;
+  } else {
+    *sh1106 = DISPLAY_SH1106_HINT;
+  }
+  return true;
+}
+
+bool board_display_init(void) {
+  _display_present = false;
+
+#if defined(DISPLAY_VSENSOR_PIN) && DISPLAY_VSENSOR_PIN >= 0
+  nrf_gpio_cfg_output(DISPLAY_VSENSOR_PIN);
+  nrf_gpio_pin_write(DISPLAY_VSENSOR_PIN, DISPLAY_VSENSOR_ON);
+  NRFX_DELAY_MS(DISPLAY_POWER_ON_MS);
+#endif
+
+  // Internal pull-ups, so an empty socket idles high and NACKs.
+  nrf_gpio_cfg(DISPLAY_PIN_SDA, NRF_GPIO_PIN_DIR_INPUT, NRF_GPIO_PIN_INPUT_CONNECT,
+               NRF_GPIO_PIN_PULLUP, NRF_GPIO_PIN_S0D1, NRF_GPIO_PIN_NOSENSE);
+  nrf_gpio_cfg(DISPLAY_PIN_SCL, NRF_GPIO_PIN_DIR_INPUT, NRF_GPIO_PIN_INPUT_CONNECT,
+               NRF_GPIO_PIN_PULLUP, NRF_GPIO_PIN_S0D1, NRF_GPIO_PIN_NOSENSE);
+
+  nrf_twim_pins_set(_twim, DISPLAY_PIN_SCL, DISPLAY_PIN_SDA);
+  nrf_twim_frequency_set(_twim, NRF_TWIM_FREQ_400K);
+  nrf_twim_enable(_twim);
+
+  uint8_t const addrs[] = { DISPLAY_I2C_ADDR, DISPLAY_I2C_ADDR ^ 0x01 };
+  bool found = false;
+  for (size_t i = 0; i < sizeof(addrs) && !found; ++i) {
+    nrf_twim_address_set(_twim, addrs[i]);
+    found = oled_probe(&_sh1106);
+  }
+  if (!found) {
+    return display_init_failed();
+  }
+
+  uint8_t off[] = { OLED_CTRL_CMD, 0xAE };
+  if (!oled_cmds(off, sizeof(off))) {
+    return display_init_failed();
+  }
+
+#ifdef DISPLAY_COL_OFFSET
+  _col_offset = DISPLAY_COL_OFFSET;
+#else
+  // An SH1106 centers its 128-column glass in 132 columns of RAM.
+  _col_offset = _sh1106 ? 2 : 0;
+#endif
+
+  uint8_t init[] = {
+      OLED_CTRL_CMD,
+      0xD5, 0x80,                       // clock divide / oscillator frequency
+      0xA8, (uint8_t)(DISPLAY_HEIGHT - 1), // multiplex ratio
+      0xD3, 0x00,                       // display offset
+      0x40,                             // start line 0
+      // SH1106 DC-DC converter on, or SSD1306 charge pump on.
+      _sh1106 ? 0xAD : 0x8D, _sh1106 ? 0x8B : 0x14,
+      // SSD1306 page addressing; page mode is the SH1106's only mode.
+      0x20, 0x02,
+      0xA1,                             // segment remap: column 127 -> SEG0
+      0xC8,                             // COM scan direction: reversed
+#if DISPLAY_HEIGHT >= 64
+      0xDA, 0x12,                       // COM pins: alternative, no remap
+#else
+      0xDA, 0x02,                       // COM pins: sequential, no remap
+#endif
+      0x81, DISPLAY_CONTRAST,
+      0xD9, 0xF1,                       // pre-charge period
+      0xDB, 0x40,                       // VCOMH deselect level
+      0xA4,                             // resume from RAM contents
+      0xA6,                             // non-inverted
+      0x2E,                             // scrolling off
+  };
+  if (!oled_cmds(init, sizeof(init))) {
+    return display_init_failed();
+  }
+
+  _display_present = true;
+
+  // GDDRAM is undefined at power-up; blank it while the panel is off.
+  uint8_t blank[DISPLAY_GDDRAM_WIDTH];
+  memset(blank, 0, sizeof(blank));
+  for (uint8_t page = 0; page < DISPLAY_HEIGHT / 8; ++page) {
+    if (!oled_write_page(page, 0, blank, sizeof(blank))) {
+      return display_init_failed();
+    }
+  }
+
+  uint8_t on[] = { OLED_CTRL_CMD, 0xAF };
+  if (!oled_cmds(on, sizeof(on))) {
+    return display_init_failed();
+  }
+
+  return true;
+}
+
+void board_display_teardown(void) {
+  if (_display_present) {
+    uint8_t off[] = { OLED_CTRL_CMD, 0xAE };
+    (void) oled_cmds(off, sizeof(off));
+    _display_present = false;
+  }
+  nrf_twim_disable(_twim);
+}
+
+static bool oled_write_page(uint8_t page, uint8_t col, uint8_t const* buf, size_t nbytes) {
+  if (!_display_present || nbytes > DISPLAY_GDDRAM_WIDTH) return false;
+
+  uint8_t addr[] = {
+      OLED_CTRL_CMD,
+      (uint8_t)(0xB0 | (page & 0x0F)),
+      (uint8_t)(0x00 | (col & 0x0F)),
+      (uint8_t)(0x10 | ((col >> 4) & 0x0F)),
+  };
+  if (!oled_cmds(addr, sizeof(addr))) return false;
+
+  // EasyDMA needs the control byte contiguous with the pixels.
+  static uint8_t page_buf[1 + DISPLAY_GDDRAM_WIDTH];
+  page_buf[0] = OLED_CTRL_DATA;
+  memcpy(page_buf + 1, buf, nbytes);
+  return twi_write(page_buf, nbytes + 1);
+}
+
+void board_display_draw_page(uint8_t page, uint8_t const* buf, size_t nbytes) {
+  if (nbytes > DISPLAY_WIDTH) return;
+  (void) oled_write_page(page, _col_offset, buf, nbytes);
+}
+
+#endif // DISPLAY_PIN_SDA

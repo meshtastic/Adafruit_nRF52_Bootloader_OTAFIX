@@ -97,6 +97,9 @@ uint32_t dfu_image_activate(void);
  */
 void dfu_reset(void);
 
+/**@brief Abandons an unfinished transfer so a new start packet is accepted, without a system reset. */
+void dfu_reset_session(void);
+
 /**@brief Function for validating that new bootloader has been correctly installed.
  *        
  * @return NRF_SUCCESS if install was successful. NRF_ERROR_NULL if the images differs.

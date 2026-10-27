@@ -1,7 +1,29 @@
 # Adafruit nRF52 Bootloader Changelog
 
-OTAFIX 2.1–2.5 are Meshtastic's fork; everything from 0.6.2 down predates
-it and is upstream Adafruit history, kept for provenance.
+2.6.0 and the OTAFIX 2.x entries below it are Meshtastic's fork; everything
+from 0.6.2 down predates it and is upstream Adafruit history, kept for
+provenance.
+
+## 2.6.0
+
+- The project is renamed the Meshtastic nRF52 Bootloader (repo `meshtastic/nRF52_Bootloader`), and releases are tagged plain `x.y.z` from 2.6.0, continuing the OTAFIX numbering. Board-IDs, BLE names and asset file names are unchanged.
+- New board: Seeed Studio Wio Tracker L1 Pro 1W (OTA DFU advertising name `WTLP_DFU`).
+- A board with a valid application that sits in DFU for 6 minutes with no activity boots its application. A BLE connection or DFU write, a UF2 drive read or write, USB enumeration, and serial DFU traffic each restart the 6 minutes; a board with no valid application keeps waiting.
+- A SoftDevice flash timeout during a BLE or serial transfer, or the activation settings save, is retried every 100 ms, up to 20 times, instead of resetting the bootloader.
+- `INFO_UF2.TXT` shows a `Last-Fault: id=0x.. pc=0x.. info=0x..` line for a SoftDevice or SDK fault the bootloader recorded since the last UF2 drive session. It appears only if the next boot reaches the drive before an application boots, since the application's RAM use wipes the record. The record lives in a 16-byte RAM region behind a magic word and is cleared once printed; for an SDK error `info` is the error code.
+- A device with no valid application that is plugged into a USB host comes up as a UF2 drive showing NO FIRMWARE instead of waiting for a phone. On battery (no VBUS) it goes straight to the BLE OTA wait, and with VBUS but no host enumerating within 3 s (a charger or power bank) it falls through to the same wait. A cabled board with no application returns to the drive after an aborted copy, and after an eject on boards built with `UF2_EXIT_ON_EJECT` (`mesh_tracker_x1`, `t1000_e`). When the cable is pulled while the drive is up (VBUS gone for 250 ms), it goes to the BLE OTA wait. Plugging a cable into a board with no application that is waiting for BLE, with no phone connected, brings the drive up (VBUS present for 250 ms); a cable already present when the wait began, or a phone connected, leaves the wait alone.
+- A UF2 application copy marks `bank_0` invalid when its first application block arrives, so a cable pulled mid-copy leaves the device with no application instead of an old `bank_0` marked valid over a half-written image. The completion path records the real application size as before.
+- A bootloader self-update whose staged image would overwrite the tail of the installed application (one larger than 744 KB on S140 6.1.1 or 740 KB on 7.3.0) marks `bank_0` invalid first, so the device comes up in DFU with no application instead of booting a corrupted one.
+- A central that disconnects mid-transfer can start a fresh BLE DFU without the board being reset.
+- DFU screens on I2C mono OLEDs (SSD1306 and SH1106), with a four-line layout: title, mode, version, and banner. A board opts in by defining `DISPLAY_PIN_SDA` in its `board.h`; `boards.h` rejects a board that also defines `DISPLAY_PIN_SCK`, since TWIM0 and SPIM0 share a peripheral. The bootloader probes 0x3C and 0x3D and reads the controller type off the panel, and a board with no panel shows nothing and otherwise behaves as before. Enabled on `wiscore_rak4631_board`, `wiscore_rak3401`, `wio_tracker_l1`, `promicro_nrf52840`, `xiao_nrf52840_ble`, and `xiao_nrf52840_ble_sense`, for about 2 KB of bootloader flash each. Verified on the RAK4631 and the Wio Tracker L1; the other four follow their firmware variants' pins. On the RAK4631 and RAK3401, DFU raises the switched 3V3_S rail (WB_IO2) that feeds the WisBlock slots, and lowers it again when no panel answers.
+- Fixed an out-of-bounds write in `printicon()` on the 160x80 `heltec_t096` and `heltec_t1`, where the third drag icon ran past the end of `frame_buf`. Those boards place it inside the panel, and `printicon()` skips any icon that would land outside.
+- Fixed BLE OTA started from an application's buttonless DFU falling back to the application after about 10 s. The 0xB1 entry now restarts through the 0xA8 path, so the bootloader initializes the SoftDevice itself; the peer data for reconnection survives the reset.
+- The DFU screen shows upload progress during UF2, serial, and BLE transfers, as a bar in place of the banner. The title reads BOOTLOADER during a bootloader update, ERASE during a factory erase, WRONG FILE for a UF2 this board cannot take, and NO FIRMWARE when DFU starts without a valid application.
+- A DFU session started after a SoftDevice update no longer ends before it begins.
+- Build change, no behavior change: the bootloader is now compiled with `-flto`, which shrinks every image by about 3.3 KB of flash. Section addresses and SoftDevice call sites are unchanged.
+- The lazy-erase packet buffer holds 16 packets instead of 8. Costs about 2 KB of `.bss`.
+- Hardening, no behavior change: `flash_nrf5x_write` splits a write that crosses a 4 KB page instead of running past its page buffer. The UF2 path accepts only 256 B blocks at 256 B-aligned addresses, so no current caller crosses a page.
+- A UF2 whose application blocks start below the installed SoftDevice's end and carry no SoftDevice (no block at 0x1000) is now rejected as WRONG FILE: every block of the file is rejected and nothing is written. An app-only image built for a different SoftDevice would have overwritten the last page of the installed one. SoftDevice+app images, app-only images at the application start, and `CURRENT.UF2` restores are unaffected; the check assumes the host writes the file front to back.
 
 ## OTAFIX 2.5
 

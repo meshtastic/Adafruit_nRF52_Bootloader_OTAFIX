@@ -1,11 +1,11 @@
-# Meshtastic OTAFIX Bootloader
+# Meshtastic nRF52 Bootloader
 
-[![Build](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/actions/workflows/githubci.yml/badge.svg)](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/actions/workflows/githubci.yml)
+[![Build](https://github.com/meshtastic/nRF52_Bootloader/actions/workflows/githubci.yml/badge.svg)](https://github.com/meshtastic/nRF52_Bootloader/actions/workflows/githubci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-Adafruit nRF52 bootloader with enhanced OTA DFU, forked for [Meshtastic](https://meshtastic.org) from [oltaco's OTAFIX bootloader](https://github.com/oltaco/Adafruit_nRF52_Bootloader_OTAFIX). This is the bootloader several nRF52-based Meshtastic devices ship with, and the one the [Meshtastic Android app](https://github.com/meshtastic/Meshtastic-Android) can upgrade in-app.
+Adafruit nRF52 bootloader with enhanced OTA DFU, forked for [Meshtastic](https://meshtastic.org) from [oltaco's OTAFIX bootloader](https://github.com/oltaco/Adafruit_nRF52_Bootloader_OTAFIX), itself a fork of [Adafruit's nRF52 bootloader](https://github.com/adafruit/Adafruit_nRF52_Bootloader). It was previously called the OTAFIX bootloader. This is the bootloader several nRF52-based Meshtastic devices ship with, and the one the [Meshtastic Android app](https://github.com/meshtastic/Meshtastic-Android) can upgrade in-app.
 
-Current release: **OTAFIX 2.5** — see [changelog.md](changelog.md) for version history.
+Current release: **OTAFIX 2.5** (tag `0.9.2-OTAFIX2.5`). Releases from 2.6.0 on are tagged plain `x.y.z`. See [changelog.md](changelog.md) for version history.
 
 ## Contents
 
@@ -18,7 +18,7 @@ Current release: **OTAFIX 2.5** — see [changelog.md](changelog.md) for version
 - [Recommended OTA DFU settings](#recommended-ota-dfu-settings)
 - [Notes on Xiao NRF52840 BLE](#notes-on-xiao-nrf52840-ble)
 - [Notes on RAK4631 bootloader](#notes-on-rak4631-bootloader)
-- [Notes on MeshTracker X1 DFU mode](#notes-on-meshtracker-x1-dfu-mode)
+- [Notes on single-button boards: T1000-E and MeshTracker X1](#notes-on-single-button-boards-t1000-e-and-meshtracker-x1)
 - [Contributing](#contributing)
 - [Getting help](#getting-help)
 - [License](#license)
@@ -56,7 +56,7 @@ There is also one thing the UF2 drive accepts that is *not* an image: the
 data in place and leaves everything else alone.
 
 BLE OTA DFU is the only *wireless* path, which is what the "OTA" in
-"OTAFIX" refers to — and it's also the bootloader's default fallback: since
+"OTAFIX" in the bootloader's former name referred to — and it's also the bootloader's default fallback: since
 **OTAFIX 2.0**, if no valid application is present, the device waits in BLE
 OTA mode automatically rather than risk getting stuck (see
 [Troubleshooting](#troubleshooting)).
@@ -86,14 +86,15 @@ bootloader and SoftDevice zip package").
 - RAK 3401
 - RAK 4631 ([See note](#notes-on-rak4631-bootloader))
 - RAK WisMesh Tag
-- Seeed Studio SenseCAP Card Tracker T1000-E
-- Seeed Studio SenseCAP MeshTracker X1 ([See note](#notes-on-meshtracker-x1-dfu-mode))
+- Seeed Studio SenseCAP Card Tracker T1000-E ([See note](#notes-on-single-button-boards-t1000-e-and-meshtracker-x1))
+- Seeed Studio SenseCAP MeshTracker X1 ([See note](#notes-on-single-button-boards-t1000-e-and-meshtracker-x1))
 - Seeed SenseCAP Solar Node P1
 - Seeed Studio Wio Tracker L1
+- Seeed Studio Wio Tracker L1 Pro 1W
 - Seeed Studio XIAO nRF52840 BLE ([See note](#notes-on-xiao-nrf52840-ble))
 - Seeed Studio XIAO nRF52840 BLE SENSE
 
-If there is another nRF52840-based Meshtastic board you would like to see supported, please [raise a GitHub issue](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/issues/new/choose) — or see [Adding a new board](./CONTRIBUTING.md#adding-a-new-board) in `CONTRIBUTING.md` if you want to submit it yourself.
+If there is another nRF52840-based Meshtastic board you would like to see supported, please [raise a GitHub issue](https://github.com/meshtastic/nRF52_Bootloader/issues/new/choose) — or see [Adding a new board](./CONTRIBUTING.md#adding-a-new-board) in `CONTRIBUTING.md` if you want to submit it yourself.
 
 ## BLE advertising names
 
@@ -119,6 +120,7 @@ When in OTA DFU mode, devices advertise using a board-specific name rather than 
 | Seeed SenseCAP Solar Node P1 | `SCAP_DFU`               |
 | Seeed T1000e                 | `T1KE_DFU`               |
 | Seeed WioTracker L1          | `WTL1_DFU`               |
+| Seeed WioTracker L1 Pro 1W   | `WTLP_DFU`               |
 | XIAO NRF52 BLE / SENSE       | `XIAO_DFU`               |
 
 ---
@@ -126,13 +128,19 @@ When in OTA DFU mode, devices advertise using a board-specific name rather than 
 ## Installation
 
 The recommended way to install the bootloader is using the UF2 file.  
-Download the UF2 file for your board (they can be found in the [releases](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/releases) with filenames beginning with `update-`), enter UF2 mode (usually by double pressing the reset button within 0.5s) and copy the UF2 file across.
+Download the UF2 file for your board (they can be found in the [releases](https://github.com/meshtastic/nRF52_Bootloader/releases) with filenames beginning with `update-`), enter UF2 mode (usually by double pressing the reset button within 0.5s; boards with no reset button hold their one button instead, see the [single-button note](#notes-on-single-button-boards-t1000-e-and-meshtracker-x1)) and copy the UF2 file across.
+
+Any board can also be put into UF2 mode from the application, with no button at all: `meshtastic --enter-dfu` over USB, or the Meshtastic Android app's firmware-update screen on a USB connection.
 
 If an incorrect bootloader has been flashed to the device, a full bootloader and SoftDevice zip package will need to be flashed using ``adafruit-nrfutil``.
 
+### Backing up the installed firmware
+
+`CURRENT.UF2` on the UF2 drive is a dump of the application currently in flash. Copy it off to keep a backup, and copy it back onto the drive to reinstall that application. Since OTAFIX 2.3-BP1.6 the dump is sized from the application start, so it is byte-for-byte the image that was installed; a dump taken with BP1.5 or older after a serial or BLE OTA update could be silently truncated, so re-take any backup made that way. Verified on a RAK4631: restore boots, and the next dump matches byte for byte.
+
 ### Factory erase
 
-To wipe the device's saved data — config, node DB, keys, BLE bonds — without a serial terminal or a special erase firmware: enter UF2 mode and copy [`meshtastic_factory_erase.uf2`](./tools/meshtastic_factory_erase.uf2) (also attached to every [release](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/releases)) onto the drive. The bootloader erases the application's data region, then reboots straight back into UF2 mode so you can copy the firmware across next. The application itself is left in place, so if you unplug instead, it boots factory-fresh. Copy this file on its own: the drive detaches about half a second after the copy finishes (or as soon as you eject it) and comes back a second or two later.
+To wipe the device's saved data — config, node DB, keys, BLE bonds — without a serial terminal or a special erase firmware: enter UF2 mode and copy [`meshtastic_factory_erase.uf2`](./tools/meshtastic_factory_erase.uf2) (also attached to every [release](https://github.com/meshtastic/nRF52_Bootloader/releases)) onto the drive. The bootloader erases the application's data region, then reboots straight back into UF2 mode so you can copy the firmware across next. The application itself is left in place, so if you unplug instead, it boots factory-fresh. Copy this file on its own: the drive detaches about half a second after the copy finishes (or as soon as you eject it) and comes back a second or two later.
 
 The file is the same for every board. It is a single UF2 block with family ID `0x4D455348` and no payload; a bootloader that predates this feature ignores it silently — check `INFO_UF2.TXT` on the drive for a `Factory-Erase:` line to know whether yours supports it. Regenerate it with `tools/make_factory_erase_uf2.py` (or `make factory-erase-uf2`).
 
@@ -152,17 +160,21 @@ With the radio connected over **USB/serial** (not Bluetooth), open the connected
 
 If the device does not show up on your computer after flashing the bootloader or performing an OTA update, it may be **waiting in OTA DFU mode**.
 
-In **OTAFIX 2.0** and above, OTA DFU is the default state when no valid application is present.  
-In this mode:
+In **OTAFIX 2.0** and above, OTA DFU is the default state when no valid application is present. From **2.6.0**, a device with no valid application on a USB host comes up as a UF2 drive showing NO FIRMWARE instead, and goes straight to OTA DFU on battery (no VBUS). With VBUS but no host (a charger or power bank) it falls through to OTA DFU after 3 seconds, as it does as soon as the cable is pulled while the drive is up. Plugging a cable into a device with no valid application that is waiting in OTA DFU, with no phone connected, brings the drive up again.
+In OTA DFU mode:
 - No UF2 drive is exposed
 - No serial port is available
 - The device is waiting for an OTA firmware update over BLE
 
 **What to do:**
 - Perform an OTA update using a supported DFU app, **or**
-- Explicitly request UF2/serial mode using **double-reset**.
+- Explicitly request UF2/serial mode using **double-reset** (or the button hold on a [single-button board](#notes-on-single-button-boards-t1000-e-and-meshtracker-x1)).
 
-This behaviour is intentional and prevents devices from getting stuck in UF2 mode after failed OTA updates.
+The OTA fallback is intentional and prevents devices from getting stuck in UF2 mode after failed OTA updates.
+
+A device with a valid application that sits in DFU for 6 minutes with no activity (no BLE connection or DFU traffic, no drive access) boots its application. A device with no valid application stays in DFU.
+
+If the bootloader recorded a fault since the last UF2 drive session, `INFO_UF2.TXT` shows a `Last-Fault:` line with the fault id, program counter, and info word. It appears only if the next boot reaches the drive before an application boots, since the application's RAM use wipes the record.
 
 ---
 
@@ -238,15 +250,17 @@ If the file shows: "Board-ID: nRF52840-SeeedXiaoSense-v1" then the ***SENSE*** v
 
 This version of the RAK4631 bootloader is based on a much newer version (0.9.2) of the Adafruit nRF52 bootloader than what RAK Wireless uses on their official bootloader (0.6.2-11). It has been tested with no problems found; whether RAK's own patches to the Adafruit bootloader introduce any behavioral difference has not been investigated. A variant of the official RAK bootloader with these patches included instead is available [here](https://github.com/oltaco/WisCore_RAK4631_Bootloader/releases).
 
-## Notes on MeshTracker X1 DFU mode
+## Notes on single-button boards: T1000-E and MeshTracker X1
 
-The X1 has a single user button, and its RESET line is not exposed as a second button, so **double-press reset does not work on this board**. Instead, hold the primary button down while the device boots: keep holding for about 3 seconds and the bootloader enters UF2 DFU mode and mounts the mass-storage drive. Releasing the button before then boots the application as normal.
+The SenseCAP Card Tracker T1000-E and the SenseCAP MeshTracker X1 each have a single user button, and their RESET line is wired to the MCU reset pin rather than a second button, so **double-press reset does not work on these boards**. From **OTAFIX 2.5** both use the same hold-to-enter scheme instead: with USB connected, hold the button while the device boots and keep holding for about 3 seconds. The bootloader enters UF2 DFU mode and mounts the mass-storage drive a few seconds later. Releasing the button before then boots the application as normal.
 
-Because a momentary press belongs to the application, a short press will *not* enter DFU — it has to be an uninterrupted hold through boot.
+Because a momentary press belongs to the application, a short press will *not* enter DFU — it has to be an uninterrupted hold through boot. A hold while the application is already running belongs to the application too (on the T1000-E a long press powers the device off). To make the device boot with the button held, either power it on with the button down, or reboot it from a client while holding the button. The power-on case is deliberate: the application sets `DFU_MAGIC_SKIP` before powering off, and a board using the hold scheme keeps checking the button through that flag rather than skipping straight to the application.
 
 To leave DFU mode, eject the mounted drive: the bootloader exits DFU and boots the application. There is no RESET button to fall back on, so this is the way out if you entered DFU and no longer want to copy firmware across. (Copying a `.uf2` across also reboots the board, as on any other board.) It has to be a real eject — `eject`, `udisksctl power-off`, or Finder/Explorer "Safely Remove" — since the bootloader only sees an eject as a SCSI START STOP UNIT.
 
-Unplugging is not a way out. The board stays in the bootloader on battery, with no LED to show it, and boots the application when you next plug it in.
+Unplugging is not a way out. The board stays in the bootloader on battery, with no LED on the X1 to show it, and plugging it back in only mounts the drive again. Eject the drive (or copy a `.uf2` across) to boot the application.
+
+Before OTAFIX 2.5 the T1000-E had no button path into DFU at all (the bootloader read the button with the wrong polarity), and an eject did not leave DFU. On those bootloaders, enter UF2 mode from the application instead: `meshtastic --enter-dfu` or the Meshtastic Android app; then install the file for your board from the [releases](https://github.com/meshtastic/nRF52_Bootloader/releases) to get the button: `update-t1000_e_bootloader-*.uf2` on the T1000-E, `update-mesh_tracker_x1_bootloader-*.uf2` on the X1. The two boards share a USB VID/PID, which is what the bootloader's self-update check keys on, so it accepts the wrong board's file without complaint. Avoid the 1200 bps serial touch on these boards: it selects serial-only DFU (`DFU_MAGIC_SERIAL_ONLY_RESET`), which exposes no drive, has no eject to leave by, and the serial DFU protocol carries no reset request, so the only way out is completing a serial DFU with `adafruit-nrfutil`.
 
 ---
 
@@ -260,7 +274,7 @@ together.
 ## Getting help
 
 - **Questions or troubleshooting:** [Meshtastic Discussions](https://github.com/orgs/meshtastic/discussions)
-- **Bug reports and feature requests:** [open an issue](https://github.com/meshtastic/Adafruit_nRF52_Bootloader_OTAFIX/issues/new/choose)
+- **Bug reports and feature requests:** [open an issue](https://github.com/meshtastic/nRF52_Bootloader/issues/new/choose)
 - **Security vulnerabilities:** see [`SECURITY.md`](./SECURITY.md) — please do not open a public issue
 - **General Meshtastic docs:** [meshtastic.org](https://meshtastic.org/)
 

@@ -62,21 +62,26 @@
 #include "nrf_error.h"
 
 #include "boards.h"
+#include "ble_dfu_cfg.h"
 
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"
 #include "pstorage.h"
 #include "nrfx_nvmc.h"
+#include "fault_record.h"
+#include "dfu_ble_svc.h"
 
 #ifdef NRF_USBD
 
 #include "uf2/uf2.h"
 #include "nrf_usbd.h"
 #include "tusb.h"
+#include "app_timer.h"
 
 void usb_init(bool cdc_only);
 void usb_teardown(void);
 bool msc_factory_erase_pending(void);
+bool usb_host_mounted(void);
 
 // tinyusb function that handles power event (detected, ready, removed)
 // We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled.
@@ -86,6 +91,7 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 #define usb_init(x)       led_state(STATE_USB_MOUNTED) // mark nrf52832 as mounted
 #define usb_teardown()
 #define msc_factory_erase_pending() false
+#define usb_host_mounted() false
 
 #endif
 
@@ -121,13 +127,6 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 // DFU_DBL_RESET magic is used to determined which mode is entered
 #define APP_ASKS_FOR_SINGLE_TAP_RESET() (*((uint32_t*)(DFU_BANK_0_REGION_START + 0x200)) == 0x87eeb07c)
 
-// These values must match the values in dfu_transport_ble.c and MAX_DFU_PKT_LEN should match BLEGATT_ATT_MTU_MAX - 3
-#define BLEGAP_EVENT_LENGTH             6
-#define BLEGATT_ATT_MTU_MAX             247
-enum {
-  BLE_CONN_CFG_HIGH_BANDWIDTH = 1
-};
-
 //--------------------------------------------------------------------+
 //
 //--------------------------------------------------------------------+
@@ -136,6 +135,9 @@ uint32_t* dbl_reset_mem = ((uint32_t*) DFU_DBL_RESET_MEM);
 // true if ble, false if serial
 bool _ota_dfu = false;
 bool _ota_connected = false;
+// Set when the OTA wait ends because a cable arrived, so main resets plain into the drive.
+static bool _ota_cable_exit = false;
+// Set when the OTA session initializes the SoftDevice, so the app jump does not initialize it twice.
 bool _sd_inited = false;
 
 bool is_ota(void) {
@@ -157,14 +159,18 @@ static void mbr_init_sd(void) {
 //
 //--------------------------------------------------------------------+
 int main(void) {
-  // Populate Boot Address and MBR Param into MBR if not already
-  // MBR_BOOTLOADER_ADDR/MBR_PARAM_PAGE_ADDR are used if available, else UICR registers are used
-  // Note: skip it for now since this will prevent us to change the size of bootloader in the future
-  // bootloader_mbr_addrs_populate();
-
   // Save bootloader version to pre-defined register, retrieved by application
   // TODO move to CF2
   BOOTLOADER_VERSION_REGISTER = (MK_BOOTLOADER_VERSION);
+
+  // 0xB1 claims the app jumped here with the SoftDevice already set up, but it
+  // also survives a reset (a lockup during the app's handover leaves exactly
+  // that). Restart on the 0xA8 path, which inits the SoftDevice itself and
+  // keeps the peer data in .noinit.
+  if (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM) {
+    NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET;
+    NVIC_SystemReset();
+  }
 
   board_init();
   bootloader_init();
@@ -212,15 +218,78 @@ int main(void) {
     bootloader_app_start();
   }
 
-  NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET; // No application was loaded, reset the system with the OTA DFU update
+  // A host mounted the drive this session or a cable arrived in the BLE wait: reset plain and let the gate decide. Otherwise the OTA wait.
+  NRF_POWER->GPREGRET = (usb_host_mounted() || _ota_cable_exit) ? 0 : DFU_MAGIC_OTA_RESET;
   NVIC_SystemReset();
 }
 
+#ifdef NRF_USBD
+// VBUSDETECT can read 0 for a short time after a reset that followed usb_teardown().
+static bool vbus_detected_settled(void) {
+  for (uint32_t waited_ms = 0;; waited_ms += 10) {
+    if (NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk) return true;
+    if (waited_ms >= 500) return false;
+    NRFX_DELAY_MS(10);
+  }
+}
+#else
+// No USB peripheral (nRF52832): never take the cabled gate.
+#define vbus_detected_settled() false
+#endif
+
+#ifdef NRF_USBD
+// No app, nothing connected, VBUS 0 -> 1 held 250 ms in the OTA wait: leave it so the cabled gate runs.
+#define OTA_VBUS_DEBOUNCE_MS 250
+APP_TIMER_DEF(_ota_vbus_timer);
+static bool _ota_vbus_was_low;
+
+static void ota_vbus_timer_handler(void* p_context) {
+  (void) p_context;
+  uint32_t usb_reg = 0;
+  sd_power_usbregstatus_get(&usb_reg);
+  if ((usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk) && !_ota_connected && !bootloader_app_is_valid()) {
+    _ota_cable_exit = true;
+    dfu_update_status_t update_status = { .status_code = DFU_RESET };
+    bootloader_dfu_update_process(update_status);
+  }
+}
+
+// A DETECTED event during a connection is dropped, so look again once the central leaves.
+static void ota_vbus_recheck(void) {
+  uint32_t usb_reg = 0;
+  sd_power_usbregstatus_get(&usb_reg);
+  if (_ota_vbus_was_low && (usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk)) {
+    app_timer_stop(_ota_vbus_timer);
+    app_timer_start(_ota_vbus_timer, APP_TIMER_TICKS(OTA_VBUS_DEBOUNCE_MS), NULL);
+  }
+}
+
+// vbus_present must come from a settled read taken before the SoftDevice starts, so a late VBUSDETECT is not seen as a plug.
+static void ota_vbus_watch_init(bool vbus_present) {
+  _ota_vbus_was_low = !vbus_present;
+  sd_power_usbdetected_enable(true);
+  sd_power_usbremoved_enable(true);
+  app_timer_create(&_ota_vbus_timer, APP_TIMER_MODE_SINGLE_SHOT, ota_vbus_timer_handler);
+  ota_vbus_recheck(); // catches a cable plugged in after the settled read
+}
+
+static void ota_vbus_event(uint32_t soc_evt) {
+  if (soc_evt == NRF_EVT_POWER_USB_REMOVED) {
+    _ota_vbus_was_low = true;
+    app_timer_stop(_ota_vbus_timer);
+  } else if (soc_evt == NRF_EVT_POWER_USB_DETECTED && _ota_vbus_was_low && !_ota_connected) {
+    app_timer_stop(_ota_vbus_timer);
+    app_timer_start(_ota_vbus_timer, APP_TIMER_TICKS(OTA_VBUS_DEBOUNCE_MS), NULL);
+  }
+}
+#else
+#define ota_vbus_watch_init(vbus_present)
+#define ota_vbus_event(evt)
+#define ota_vbus_recheck()
+#endif
+
 static void check_dfu_mode(void) {
   uint32_t const gpregret = NRF_POWER->GPREGRET;
-
-  // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
-  _sd_inited = (gpregret == DFU_MAGIC_OTA_APPJUM);
 
   // Start Bootloader in BLE OTA mode
   _ota_dfu = (gpregret == DFU_MAGIC_OTA_APPJUM) || (gpregret == DFU_MAGIC_OTA_RESET);
@@ -312,21 +381,30 @@ static void check_dfu_mode(void) {
     (*dbl_reset_mem) = 0;
   }
 
+  // No valid app and a cable present: serve the UF2 drive instead of waiting for a phone.
+  // Without a host the 3 s timeout below falls through to the OTA wait.
+  // An OTA entry with a valid app takes the settled read too, only to seed the cable watch.
+  bool const vbus_present = (!valid_app || _ota_dfu) && vbus_detected_settled();
+  if (vbus_present && !dfu_start) uf2_dfu = true;
+
   if ((dfu_start || !valid_app) && !serial_only_dfu && !uf2_dfu && !double_reset) {
     _ota_dfu = true; // set default to OTA only when no explicit UF2/serial/dbl-reset
   }
 
   // Enter DFU mode accordingly to input
   if (dfu_start || !valid_app) {
+    if (!valid_app) screen_set_title("NO FIRMWARE");
     if (_ota_dfu) {
-      #ifdef DISPLAY_PIN_SCK
-        board_display_init();
-        screen_draw_ble();
+      #ifdef BOARD_HAS_DISPLAY
+        if (board_display_init()) {
+          screen_draw_ble();
+        }
       #endif
       led_state(STATE_BLE_DISCONNECTED);
-      if (!_sd_inited) mbr_init_sd();
+      mbr_init_sd();
       _sd_inited = true;
       ble_stack_init();
+      ota_vbus_watch_init(vbus_present);
     } else {
       led_state(STATE_USB_UNMOUNTED);
       usb_init(serial_only_dfu);
@@ -374,8 +452,8 @@ static uint32_t ble_stack_init(void) {
   sd_nvic_EnableIRQ(SD_EVT_IRQn);
 
   /*------------- Configure BLE params  -------------*/
-  extern uint32_t __data_start__[]; // defined in linker
-  uint32_t ram_start = (uint32_t) __data_start__;
+  extern uint32_t __sd_ram_end__[]; // defined in linker: the SoftDevice owns RAM below it
+  uint32_t ram_start = (uint32_t) __sd_ram_end__;
 
   ble_cfg_t blecfg;
 
@@ -422,7 +500,18 @@ static uint32_t ble_stack_init(void) {
 //--------------------------------------------------------------------+
 // Error Handler
 //--------------------------------------------------------------------+
+// The peer data and its CRC (dfu_ble_svc.c) occupy the first 0x40 bytes of NOINIT.
+STATIC_ASSERT(sizeof(dfu_ble_peer_data_t) + sizeof(uint16_t) <= 0x40);
+STATIC_ASSERT(sizeof(fault_record_t) <= 0x10);
+fault_record_t g_fault_record __attribute__((section(".fault_record")));
+
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info) {
+  // For SDK errors info points at a stack error_info_t that will not survive the reset.
+  if (id == NRF_FAULT_ID_SDK_ERROR && info != 0) info = ((error_info_t const*) info)->err_code;
+  g_fault_record.id = id;
+  g_fault_record.pc = pc;
+  g_fault_record.info = info;
+  g_fault_record.magic = FAULT_RECORD_MAGIC;
   volatile uint32_t* ARM_CM_DHCSR = ((volatile uint32_t*) 0xE000EDF0UL); /* Cortex M CoreDebug->DHCSR */
   if ((*ARM_CM_DHCSR) & 1UL) __asm("BKPT #0\n"); /* Only halt mcu if debugger is attached */
   NVIC_SystemReset();
@@ -459,6 +548,7 @@ uint32_t proc_ble(void) {
       case BLE_GAP_EVT_DISCONNECTED:
         _ota_connected = false;
         led_state(STATE_BLE_DISCONNECTED);
+        ota_vbus_recheck();
         break;
 
       default:
@@ -480,6 +570,12 @@ uint32_t proc_soc(void) {
 
   if (NRF_SUCCESS == err) {
     pstorage_sys_event_handler(soc_evt);
+
+    // USB is not inited in the OTA wait; its power events only feed the cable watch.
+    if (_ota_dfu) {
+      ota_vbus_event(soc_evt);
+      return err;
+    }
 
 #ifdef NRF_USBD
     /*------------- usb power event handler -------------*/

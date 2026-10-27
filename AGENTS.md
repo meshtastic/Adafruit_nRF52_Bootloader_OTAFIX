@@ -14,13 +14,14 @@ Canonical guidance for AI coding agents and maintainers working in this repo.
 2. The rest of `README.md` — boards supported, installation, the Meshtastic
    Android in-app upgrade flow, troubleshooting.
 3. `CONTRIBUTING.md` — dev setup, PR process, adding a new board.
-4. `changelog.md` — OTAFIX version history (2.1–2.3 at the top; everything
-   below predates the OTAFIX fork).
+4. `changelog.md` — version history (`2.6.0` and the `OTAFIX 2.x` entries at
+   the top; everything below predates the OTAFIX fork).
 5. The design invariants and gotchas below — do not violate them.
 
 ## What this is
 
-Meshtastic's fork (org-owned since 2026-08) of
+The Meshtastic nRF52 Bootloader (formerly the OTAFIX bootloader; repo
+`meshtastic/nRF52_Bootloader`), org-owned since 2026-08. It is a fork of
 [oltaco's OTAFIX bootloader](https://github.com/oltaco/Adafruit_nRF52_Bootloader_OTAFIX),
 itself a fork of `adafruit/Adafruit_nRF52_Bootloader` with OTA DFU
 enhancements. It's the bootloader several nRF52-based Meshtastic devices
@@ -31,8 +32,7 @@ can upgrade in-app over USB/serial (`feature/firmware` there).
 Meshtastic's separate `Adafruit_nRF52_Bootloader` fork is a **different
 lineage without** the OTAFIX patches — don't confuse the two.
 
-This is C, built with a bare Makefile (the supported path) or `CMakeLists.txt`
-(**not** fully wired — see the CMake gotcha below). Not PlatformIO.
+This is C, built with a bare Makefile. Not PlatformIO.
 
 ## Build
 
@@ -60,31 +60,33 @@ No lint, no test suite — this is a bootloader; the only correctness signal is
 ### Board abstraction: `src/boards/<board>/`
 
 Each board directory can carry:
-- `board.h` — pin/peripheral defines (`DISPLAY_PIN_SCK` gates the OLED code
-  in `src/screen.c` and `src/images.c`; `BLEDIS_MANUFACTURER`/`BLEDIS_MODEL`
-  are the real vendor name, e.g. RAKWireless — don't rebrand these).
+- `board.h` — pin/peripheral defines. Defining `DISPLAY_PIN_SCK` (SPI TFT)
+  or `DISPLAY_PIN_SDA` (I2C OLED), never both, makes `src/boards/boards.h`
+  define `BOARD_HAS_DISPLAY`, which gates the display code in `src/screen.c`
+  and `src/images.c`. `BLEDIS_MANUFACTURER`/`BLEDIS_MODEL` are the real
+  vendor name, such as RAKWireless — don't rebrand these.
   Defining `BANNER_TEXT` overrides the on-screen DFU banner default in
   `src/screen.c`.
 - `board.mk` — Makefile board config (`MCU_SUB_VARIANT`, per-board
   `CFLAGS` like the BLE `DEVICE_NAME`).
-- `board.cmake` — **only exists for 4 of 18 boards** (`heltec_t096`,
-  `heltec_t1`, `heltec_t114`, `thinknode_m1`). `cmake -DBOARD=<anything
-  else>` fails outright. Nobody
-  uses the CMake path in practice (CI and `tools/build_all.py` both use
-  `make`); don't assume feature parity between the two build systems.
 - `pinconfig.c` — present on some boards, board-specific pin table.
 
-`Makefile` and `CMakeLists.txt` both dynamically discover the board's files
-under `src/boards/$(BOARD)/` — there is no separate hardcoded board list to
-keep in sync in either build system (unlike the CI matrix, see below).
+The `Makefile` takes the board from `BOARD`: it includes
+`src/boards/$(BOARD)/board.mk`, puts `src/boards/$(BOARD)` on the include path
+for `board.h`, and compiles `pinconfig.c` on every MCU but the nRF52832. Other sources are
+listed explicitly, so a new file in a board directory is not compiled until the
+`Makefile` names it. There is no separate board list to keep in sync here;
+the one hand-kept list is branch protection's required checks (see CI below).
 
 ### Core bootloader (`src/`)
 
 `main.c` is the entry point (MBR/SoftDevice handoff, DFU state machine
 dispatch). `dfu_magic.h` holds the `NRF_POWER->GPREGRET` magics an
-application (or the bootloader itself) writes to pick the next boot mode. `screen.c`/`images.c` render the OLED UF2/BLE-OTA screens, active
-only when the board defines `DISPLAY_PIN_SCK` — today that's `heltec_t096`,
-`heltec_t1`, and `heltec_t114`. `dfu_ble_svc.c`/`dfu_init.c` are the BLE DFU
+application (or the bootloader itself) writes to pick the next boot mode. `screen.c`/`images.c` render the DFU UF2/BLE-OTA screens, active
+only when the board names a display bus (`DISPLAY_PIN_SCK` or
+`DISPLAY_PIN_SDA`, see `board.h` above). The I2C OLED path probes 0x3C and
+0x3D and reads the controller type off the panel, so a missing panel only
+means no picture. `dfu_ble_svc.c`/`dfu_init.c` are the BLE DFU
 service; `flash_nrf5x.c` wraps flash writes. `usb/` is the USB MSC (UF2
 drive) + CDC stack on top of the vendored `lib/tinyusb`. A UF2 block with
 family `CFG_UF2_MESHTASTIC_ERASE_ID` (`usb/uf2/uf2cfg.h`) is a factory-erase
@@ -122,9 +124,8 @@ when the rework lands. `lib/tinyusb` and `lib/uf2` are unaffected.
 `lib/tinyusb`'s `nrf5x` USB port (`dcd_nrf5x.c`) calls nrfx's chip-specific
 errata functions (e.g. `nrf52_errata_199()`) — bumping tinyusb alone,
 without nrfx at a version new enough to define them, fails to compile. The
-two submodules move together, not independently, which is why Renovate's
-separate per-submodule PRs (#11, #12 as originally filed) each failed CI on
-their own; see the `linker/nrf_common.ld` gotcha below for the other half of
+two submodules move together, not independently, and a Renovate PR that
+bumps either one alone fails CI; see the `linker/nrf_common.ld` gotcha below for the other half of
 what that joint bump needed.
 
 `lib/softdevice/` vendors Nordic's SoftDevice binaries directly (not a
@@ -133,7 +134,7 @@ submodule) — `SD_NAME`/`SD_VERSION` in `Makefile` select which one.
 ### CI (`.github/workflows/githubci.yml`)
 
 A `set-matrix` job lists `src/boards/*/` and fans out a `build` job per
-board (currently 18), on every PR and on `release: created`. On release
+board, on every PR and on `release: created`. On release
 events a single `release` job downloads every board's artifacts and uploads
 `.zip`/`.hex`/`update-*.uf2` per board plus `tools/meshtastic_factory_erase.uf2`
 as release assets; PR runs just validate the compile and get 1-day artifact
@@ -141,21 +142,19 @@ retention (release runs keep 90). Only `release` holds `contents: write` —
 every job that runs repo code (`make`, `tools/`) is read-only with
 `persist-credentials: false`, so a PR cannot borrow a write token.
 
-Branch protection on `master` requires all 19 checks (`set-matrix` + 18
-`build (<board>)` contexts) by literal name. **Adding, removing, or renaming
+Branch protection on `master` requires `set-matrix` and one
+`build (<board>)` context per board, by literal name. **Adding, removing, or renaming
 a board changes those context names** — branch protection does not update
 itself; a human has to edit it too.
 
 ## Gotchas
 
+- **Release tags are bare `x.y.z`.** The Makefile parses the first
+  dash-separated `x.y.z` of `git describe` into `MK_BOOTLOADER_VERSION`, so a
+  `v` prefix breaks the build.
 - **ARM GCC version matters.** CI pins exactly `12.3.Rel1`; 13.3.Rel1 also
   compiles clean and is the closest verified-working version if you can't
-  get the exact CI-pinned one. GCC 15 used to fail with
-  `-Werror=array-bounds` in
-  `lib/sdk11/components/libraries/bootloader_dfu/bootloader_settings.c`
-  (a false positive on a fixed MBR-address read); Adafruit's fix (a scoped
-  `#pragma GCC diagnostic`, backported in #26) is in, but nobody has rebuilt
-  here with GCC 15 since — if you do, update this note.
+  get the exact CI-pinned one. GCC 15 is unverified here.
 - **MeshCore/Ripple content has been deliberately removed** from the docs
   (README, changelog) — this is Meshtastic's own branded fork now, not a
   place to re-add other companion-firmware documentation. If you're
@@ -184,25 +183,23 @@ itself; a human has to edit it too.
   upgrade support with no board here yet (issues #4, #5) — bringing up a
   new board needs real hardware to get `UF2_BOARD_ID`/VID-PID/pin defs
   right; don't fabricate a `board.h` without one.
-- **`CURRENT.UF2` dump-and-restore used to hang the device — fixed in #20,
-  don't reintroduce it.** Root cause: `CURRENT.UF2` was sized off the max
-  possible app region (`TRUE_USER_FLASH_SIZE`) instead of the real
-  installed app, AND `msc_uf2.c`'s UF2-app-flash completion path never
-  recorded the real app size into `bootloader_settings.bank_0_size` (stayed
-  0 from a `memset`, only the DFU-serial protocol populated it). Together
-  that meant restoring a `CURRENT.UF2` dump byte-for-byte could still hang
-  the device on boot. Both fixed together in #20 (`ghostfat.c`'s
-  `current_flash_size()` + `msc_uf2.c`'s `update_status.app_size`) —
-  verified on real RAK4631 hardware, the same dump-and-restore sequence
-  that hung now completes in ~2 seconds. If you change either of those two
-  files, check this still holds.
+- **A `CURRENT.UF2` dump restored byte-for-byte must boot.** Two things
+  hold it: `CURRENT.UF2` is sized off the installed app (`ghostfat.c`'s
+  `current_flash_size()`), falling back to the max app region
+  (`TRUE_USER_FLASH_SIZE`) only when `bank_0_size` is zero, erased or
+  oversized, as after a debug-probe flash, and the UF2 flash completion path records the real app size into
+  `bootloader_settings.bank_0_size` (`msc_uf2.c`'s `update_status.app_size`);
+  otherwise only serial DFU sets it. Lose either and the restored device hangs
+  on boot. If you change either file, re-run dump-and-restore on hardware.
 - **Flashing the bootloader+SoftDevice package over serial DFU zeros
-  `bank_0` — the device then boots into BLE-OTA wait mode, not the app,
-  on its own.** Confirmed on real RAK4631 hardware (2026-08-19): after
-  `adafruit-nrfutil dfu serial --package <board>_bootloader-..._s140_...zip`
-  reports "Device programmed", the board goes USB-silent (no serial port,
-  no UF2 drive) because `bank_0_size` is now 0 and this bootloader's
-  documented OTAFIX 2.0+ behavior is to default to BLE-OTA rather than get
-  stuck. This is expected, not a brick: double-press reset to force UF2
-  mode and drag the app's `.uf2` across, or complete a BLE OTA DFU to the
-  same effect. Don't reflash blind expecting the app to still be running.
+  `bank_0` — the device then has no app and does not boot on its own.**
+  After `adafruit-nrfutil dfu serial --package <board>_bootloader-..._s140_...zip`
+  reports "Device programmed", a board on a USB host comes up as a UF2 drive
+  showing NO FIRMWARE; drag the app's `.uf2` across. On battery (no VBUS) the
+  gate's 500 ms settle fails and it goes straight to the BLE-OTA wait; VBUS
+  with no host (a charger or power bank) gets the drive for 3 s first, and
+  unplugging the cable while the drive is up goes to the wait too. Plugging a cable into a no-app board that is
+  waiting for BLE, with no phone connected, brings the drive up (VBUS 0 to 1
+  during the wait, held 250 ms; `ota_vbus_event` in `main.c`). A cable already
+  present when the wait began does not: double-press reset for the drive, or
+  complete a BLE OTA DFU.

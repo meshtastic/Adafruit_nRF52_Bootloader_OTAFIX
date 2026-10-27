@@ -285,6 +285,9 @@ uint32_t pstorage_load(uint8_t *           p_dest,
  */
 uint32_t pstorage_clear(pstorage_handle_t * p_base_id, pstorage_size_t size);
 
+/**@brief Drops buffered stores that wait on a lazy erase, without calling their callbacks. */
+void pstorage_discard_pending(void);
+
 /**@brief Function for getting the number of pending operations with the module.
  *
  * @param[out] p_count Number of storage operations pending with the module. If 0, there are no 
