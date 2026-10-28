@@ -106,7 +106,7 @@ device has.
 | Seeed Studio SenseCAP MeshTracker X1 ([See note](#notes-on-single-button-boards-t1000-e-and-meshtracker-x1)) | `mesh_tracker_x1` | S140 7.3.0 | |
 | Seeed SenseCAP Solar Node P1 | `sensecap_solar_p1` | S140 7.3.0 | |
 | Seeed Studio Wio Tracker L1 | `wio_tracker_l1` | S140 7.3.0 | I2C OLED |
-| Seeed Studio Wio Tracker L1 Pro 1W | `wio_tracker_l1_pro_1w` | S140 7.3.0 | |
+| Seeed Studio Wio Tracker L1 Pro 1W | `wio_tracker_l1_pro_1w` | S140 7.3.0 | I2C OLED |
 | Seeed Studio XIAO nRF52840 BLE ([See note](#notes-on-xiao-nrf52840-ble)) | `xiao_nrf52840_ble` | S140 7.3.0 | I2C OLED |
 | Seeed Studio XIAO nRF52840 BLE SENSE | `xiao_nrf52840_ble_sense` | S140 7.3.0 | I2C OLED |
 
@@ -231,7 +231,7 @@ The file is the same for every board. It is a single UF2 block with family ID `0
 
 ## DFU screens
 
-Boards marked in the [board table](#boards-supported) show a screen while in DFU mode: the Heltec T096, T1 and T114 on their SPI TFT, and (2.6.0 and later) the RAK4631, RAK3401, Wio Tracker L1, ProMicro nRF52840 and both XIAO nRF52840 boards on a 128x64 I2C OLED at address 0x3C or 0x3D. The OLED path reads the controller type (SSD1306 or SH1106) off the panel; a board with no panel attached shows nothing and otherwise behaves the same. On the RAK4631 and RAK3401 the bootloader powers the switched 3V3_S rail that feeds the WisBlock slots while in DFU, and turns it off again if no panel answers.
+Boards marked in the [board table](#boards-supported) show a screen while in DFU mode: the Heltec T096, T1 and T114 on their SPI TFT, and (2.6.0 and later) the RAK4631, RAK3401, Wio Tracker L1 and L1 Pro 1W, ProMicro nRF52840 and both XIAO nRF52840 boards on a 128x64 I2C OLED at address 0x3C or 0x3D. The OLED path reads the controller type (SSD1306 or SH1106) off the panel; a board with no panel attached shows nothing and otherwise behaves the same. On the RAK4631 and RAK3401 the bootloader powers the switched 3V3_S rail that feeds the WisBlock slots while in DFU, and turns it off again if no panel answers.
 
 The OLED shows the board name, the mode (`USB UF2` or `BLE OTA`), the bootloader version, and a banner line; the TFT shows the same first and last lines with a drag-and-drop picture (`firmware.uf2` to the drive's volume label) or `BLE OTA` between them:
 
