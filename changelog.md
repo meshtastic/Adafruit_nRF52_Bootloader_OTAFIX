@@ -25,6 +25,7 @@ provenance.
 - The lazy-erase packet buffer holds 16 packets instead of 8. Costs about 2 KB of `.bss`.
 - Hardening, no behavior change: `flash_nrf5x_write` splits a write that crosses a 4 KB page instead of running past its page buffer. The UF2 path accepts only 256 B blocks at 256 B-aligned addresses, so no current caller crosses a page.
 - A UF2 whose application blocks start below the installed SoftDevice's end and carry no SoftDevice (no block at 0x1000) is now rejected as WRONG FILE: every block of the file is rejected and nothing is written. An app-only image built for a different SoftDevice would have overwritten the last page of the installed one. SoftDevice+app images, app-only images at the application start, and `CURRENT.UF2` restores are unaffected; the check assumes the host writes the file front to back.
+- The UF2 drive's SCSI inquiry reads vendor `Mesh`, product `Meshtastic UF2` instead of `Adafruit`, `nRF UF2` (the vendor field holds 8 characters). The volume label, `INFO_UF2.TXT` and the USB descriptors are unchanged.
 
 ## OTAFIX 2.5
 
