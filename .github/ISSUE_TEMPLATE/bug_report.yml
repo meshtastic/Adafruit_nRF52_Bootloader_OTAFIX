@@ -15,13 +15,19 @@ body:
         - Elecrow ThinkNode M1
         - Elecrow ThinkNode M3
         - Elecrow ThinkNode M6
+        - Heltec T096
+        - Heltec T1
         - Heltec Automation Mesh Node T114
         - LilyGO T-Echo
         - Minewsemi MX25LE01
+        - MuziWorks Base Uno / Base Duo / Superbase
+        - Meshtastic Generic (meshtastic_6.1.1 / meshtastic_7.3.0)
         - Nologo ProMicro NRF52840 (SuperMini NRF52840)
+        - RAK 3401
         - RAK 4631
         - RAK WisMesh Tag
         - Seeed Studio SenseCAP Card Tracker T1000-E
+        - Seeed Studio SenseCAP MeshTracker X1
         - Seeed SenseCAP Solar Node P1
         - Seeed Studio Wio Tracker L1
         - Seeed Studio Wio Tracker L1 Pro 1W

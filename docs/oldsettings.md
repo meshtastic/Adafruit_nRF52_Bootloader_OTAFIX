@@ -1,5 +1,5 @@
 
-These are the recommended settings for OTAFIX-v1.2 and earlier.<br/><br/>
+Historical page. These are the recommended settings for bootloaders before OTAFIX 2.1 (OTAFIX 1.2 and earlier). For OTAFIX 2.1 and later, including 2.6.0, use the [settings in the README](../README.md#recommended-ota-dfu-settings).<br/><br/>
 
 <table>
 <tr>
