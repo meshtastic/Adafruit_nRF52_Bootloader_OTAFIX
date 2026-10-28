@@ -74,7 +74,7 @@
 #endif // DISPLAY_MONO
 
 #ifndef BANNER_TEXT
-#define BANNER_TEXT "meshtastic.org - OTAFIX by oltaco"
+#define BANNER_TEXT "meshtastic.org"
 #endif //BANNER_TEXT
 
 #include <string.h>

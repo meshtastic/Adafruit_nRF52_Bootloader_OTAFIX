@@ -6,7 +6,7 @@ provenance.
 
 ## 2.6.0
 
-- The project is renamed the Meshtastic nRF52 Bootloader (repo `meshtastic/nRF52_Bootloader`), and releases are tagged plain `x.y.z` from 2.6.0, continuing the OTAFIX numbering. Board-IDs, BLE names and asset file names are unchanged.
+- The project is renamed the Meshtastic nRF52 Bootloader (repo `meshtastic/nRF52_Bootloader`), and releases are tagged plain `x.y.z` from 2.6.0, continuing the OTAFIX numbering. Board-IDs, BLE names and asset file names are unchanged. The DFU banner on color-screen boards reads `meshtastic.org`.
 - New board: Seeed Studio Wio Tracker L1 Pro 1W (OTA DFU advertising name `WTLP_DFU`).
 - New boards: `meshtastic_6.1.1` and `meshtastic_7.3.0`, generic nRF52840 bootloaders for DIY boards with no board-specific one, for S140 6.1.1 and 7.3.0 (Board-IDs `nRF52840-Meshtastic-Generic-S140v6` and `-S140v7`, OTA DFU name `MESH_DFU`). They drive no LED, and their required button is the reset pin P0.18 so it claims no free GPIO. They share USB `0x239A:0x0029` with the RAK4631, RAK3401, T-Echo, WisMesh Tag and MX25LE01, so their update UF2 installs over those boards' bootloaders and the reverse.
 - A board with a valid application that sits in DFU for 6 minutes with no activity boots its application. A BLE connection or DFU write, a UF2 drive read or write, USB enumeration, and serial DFU traffic each restart the 6 minutes; a board with no valid application keeps waiting.
