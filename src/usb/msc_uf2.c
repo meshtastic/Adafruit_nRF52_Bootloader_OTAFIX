@@ -89,7 +89,7 @@ void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16
 {
   (void) lun;
 
-  const char vid[] = "Adafruit";
+  const char vid[] = "Meshtast";
   const char pid[] = "nRF UF2";
   const char rev[] = "1.0";
 
