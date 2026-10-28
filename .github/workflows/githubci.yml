@@ -41,8 +41,8 @@ jobs:
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
   # The factory-erase UF2 is one file for every board, so it is checked in and
-  # attached once by the `release` job rather than by each of the 17 build
-  # jobs, which would race deleting and re-uploading the same asset name.
+  # attached once by the `release` job rather than by each per-board build
+  # job, which would race deleting and re-uploading the same asset name.
   # Not a required status check on master unless a human adds it to branch
   # protection.
   factory-erase-uf2:
