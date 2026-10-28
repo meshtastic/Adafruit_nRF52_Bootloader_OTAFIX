@@ -6,7 +6,7 @@
 | ------------------- | ------------------ |
 | 2.6.0 and later      | :white_check_mark: |
 | OTAFIX 2.x           | :white_check_mark: |
-| < OTAFIX 2.0         | :x:                |
+| < OTAFIX 2.1         | :x:                |
 
 ## Reporting a Vulnerability
 

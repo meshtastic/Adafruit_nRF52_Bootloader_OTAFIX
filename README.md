@@ -62,7 +62,7 @@ There is also one thing the UF2 drive accepts that is *not* an image: the
 data in place and leaves everything else alone.
 
 BLE OTA DFU is the only *wireless* path, and it is the bootloader's fallback
-when nothing else applies: since **OTAFIX 2.0**, a device with no valid
+when nothing else applies: since **OTAFIX 2.1**, a device with no valid
 application waits in BLE OTA mode rather than risk getting stuck. From
 **2.6.0** that device first checks for a USB cable: on a host it comes up as
 a UF2 drive showing NO FIRMWARE, and only on battery, or on a charger with no
@@ -266,7 +266,7 @@ With the radio connected over **USB/serial** (not Bluetooth), open the connected
 
 If the device does not show up on your computer after flashing the bootloader or performing an OTA update, it may be **waiting in OTA DFU mode**.
 
-In **OTAFIX 2.0** and above, OTA DFU is the default state when no valid application is present. From **2.6.0**, a device with no valid application takes the UF2 drive instead whenever a USB host is attached, and reaches OTA DFU only on battery or on a charger; the full routing is under [The UF2 drive](#the-uf2-drive).
+In **OTAFIX 2.1** and above, OTA DFU is the default state when no valid application is present. From **2.6.0**, a device with no valid application takes the UF2 drive instead whenever a USB host is attached, and reaches OTA DFU only on battery or on a charger; the full routing is under [The UF2 drive](#the-uf2-drive).
 
 In OTA DFU mode:
 - No UF2 drive is exposed
@@ -321,7 +321,7 @@ or **nRF Connect**
 
 **nRF Device Firmware Update** is the recommended app of the two.
 
-For **OTAFIX 2.0** and later, including 2.6.0, the following settings are recommended (these may change; feel free to experiment and report findings via a GitHub issue):
+For **OTAFIX 2.1** and later, including 2.6.0, the following settings are recommended (these may change; feel free to experiment and report findings via a GitHub issue):
 
 <table>
 <tr>
@@ -352,7 +352,7 @@ For **OTAFIX 2.0** and later, including 2.6.0, the following settings are recomm
 
 **IMPORTANT:**  
 On <u>older versions</u> of the bootloader, performing an OTA update while the device was connected to a computer USB host would complete successfully but **would not automatically boot into the new application firmware**, requiring a manual reset.  
-This issue is fixed in **OTAFIX 2.0**.
+This issue is fixed in **OTAFIX 2.1**.
 
 ---
 
