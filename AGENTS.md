@@ -75,20 +75,80 @@ The `Makefile` takes the board from `BOARD`: it includes
 `src/boards/$(BOARD)/board.mk`, puts `src/boards/$(BOARD)` on the include path
 for `board.h`, and compiles `pinconfig.c` on every MCU but the nRF52832. Other sources are
 listed explicitly, so a new file in a board directory is not compiled until the
-`Makefile` names it. There is no separate board list to keep in sync here;
-the one hand-kept list is branch protection's required checks (see CI below).
+`Makefile` names it. The build and CI discover boards from the directory, but
+four hand-kept lists do not: the README's board table and BLE names table,
+the board dropdown in `.github/ISSUE_TEMPLATE/bug_report.yml`, and branch
+protection's required checks (see CI below).
 
 ### Core bootloader (`src/`)
 
 `main.c` is the entry point (MBR/SoftDevice handoff, DFU state machine
 dispatch). `dfu_magic.h` holds the `NRF_POWER->GPREGRET` magics an
-application (or the bootloader itself) writes to pick the next boot mode. `screen.c`/`images.c` render the DFU UF2/BLE-OTA screens, active
+application (or the bootloader itself) writes to pick the next boot mode.
+`ble_dfu_cfg.h` holds the ATT MTU (247), the connection event length (6)
+and the high-bandwidth connection config tag that `main.c`'s SoftDevice
+config and `dfu_transport_ble.c` must agree on.
+
+The cable routing for a board with no valid application lives in three
+places. `check_dfu_mode()` in `main.c` takes a settled `VBUSDETECT` read
+(`vbus_detected_settled()`, up to 500 ms, because the bit can read 0 briefly
+after a reset that followed `usb_teardown()`) and picks the UF2 drive with
+the 3 s host timeout when VBUS is present, the BLE OTA wait otherwise. In
+the OTA wait, `ota_vbus_*` in `main.c` watches the SoftDevice's USB power
+events for a 0-to-1 VBUS transition held 250 ms with no central connected,
+and ends the session so the gate runs again; the watch seeds from the
+settled read so a cable already present does not count. In UF2 mode,
+`tud_umount_cb` in `usb/usb.c` arms a 250 ms timer when VBUS is gone and no
+application is valid, and ends the session so `main()` resets into the OTA
+wait. `main()` resets plain when a host mounted the drive this session or the
+cable watch fired, and with `DFU_MAGIC_OTA_RESET` otherwise; a plain reset
+lets the gate decide again, the magic forces the wait.
+
+`bootloader_dfu_start()` (`lib/sdk11/.../bootloader.c`) arms a 1 s tick that
+boots a valid application after `DFU_INACTIVITY_TIMEOUT_MS` (6 minutes) of
+idle. Idle is the absence of `dfu_activity()` calls: the BLE transport calls
+it on connect and on every DFU event, the serial transport on every packet,
+`msc_uf2.c` on every MSC read and write, and `usb.c` on USB mount. A new
+transport or activity source must call it, or the timer boots the
+application mid-session. The tick keeps running with no valid application,
+but the exit is skipped, so the wait continues.
+
+`src/fault_record.h` and `app_error_fault_handler()` in `main.c` record a
+SoftDevice or SDK fault (id, pc, info; for an SDK error `info` is the error
+code) into a 16-byte `FAULT_RECORD` region at `0x20008000` that every linker
+script places above the SoftDevice's RAM and outside `.data`/`.bss`, so the
+reset that follows keeps it. `ghostfat.c`'s `uf2_init()` prints it as the
+`Last-Fault:` line of `INFO_UF2.TXT` and clears the magic. `__sd_ram_end__`
+is derived from that region's origin, so moving it moves the SoftDevice's
+RAM base.
+
+`lib/sdk11/.../pstorage/pstorage_raw.c` re-issues a flash operation the
+SoftDevice reports as timed out (`NRF_EVT_FLASH_OPERATION_ERROR`) from an
+`app_timer`, every `FLASH_RETRY_DELAY_MS` (100 ms) up to `FLASH_RETRY_LIMIT`
+(20) times, and reports `NRF_ERROR_TIMEOUT` after that, which the DFU
+callbacks treat as fatal; a `NRF_ERROR_BUSY` rejection re-issues through the
+scheduler on its own bound, and any other rejection reports its own code.
+
+`dfu_transport_ble.c` resets the DFU session state on an unexpected
+disconnect (`session_reset()`) and restarts advertising, so a central that
+dropped mid-transfer can send a fresh START_DFU without the board being
+reset. `screen.c`/`images.c` render the DFU UF2/BLE-OTA screens, active
 only when the board names a display bus (`DISPLAY_PIN_SCK` or
 `DISPLAY_PIN_SDA`, see `board.h` above). The I2C OLED path probes 0x3C and
 0x3D and reads the controller type off the panel, so a missing panel only
-means no picture. `dfu_ble_svc.c`/`dfu_init.c` are the BLE DFU
-service; `flash_nrf5x.c` wraps flash writes. `usb/` is the USB MSC (UF2
-drive) + CDC stack on top of the vendored `lib/tinyusb`. A UF2 block with
+means no picture. `screen_set_title()` replaces the board name on the first
+line (NO FIRMWARE, WRONG FILE, BOOTLOADER, ERASE) and `screen_set_progress()`
+turns the banner line into a bar; both are no-ops on a board with no
+display. `dfu_ble_svc.c`/`dfu_init.c` are the BLE DFU
+service; `flash_nrf5x.c` wraps flash writes and splits a write that crosses
+a 4 KB page. `usb/` is the USB MSC (UF2
+drive) + CDC stack on top of the vendored `lib/tinyusb`. `ghostfat.c`'s
+`write_block()` marks `bank_0` invalid on the first application block it
+accepts (so a half-written image never boots) and rejects, for the rest of
+the file, an app-family image whose blocks start below the application
+start without a SoftDevice block at `USER_FLASH_START` (one built for the
+other SoftDevice); the staged bootloader write marks an application that
+reaches into the staging area invalid first. A UF2 block with
 family `CFG_UF2_MESHTASTIC_ERASE_ID` (`usb/uf2/uf2cfg.h`) is a factory-erase
 request: `ghostfat.c` flags it, `msc_uf2.c` erases the whole App Data reservation
 (`USER_FLASH_END`..`BOOTLOADER_REGION_START`) once the host has acked the
